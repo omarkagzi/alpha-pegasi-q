@@ -1,28 +1,58 @@
-// In a real production app, this would sync with a server endpoint.
-// For now, it computes the sun position based on a localized real-time clock.
+export const DAY_CYCLE_MINUTES = 24;
 
-export const simulatePlanetTime = () => {
-    const DAY_CYCLE_MINUTES = 24;
-    const now = Date.now();
-    
-    // Convert real time into our game time cycle
-    // One full 24 real-world minute cycle = 1 in-game day
-    const cycleMs = DAY_CYCLE_MINUTES * 60 * 1000;
-    const timeInCycle = now % cycleMs;
-    const normalizedTime = timeInCycle / cycleMs; // 0.0 to 1.0
-    
-    return normalizedTime;
+export interface ServerTimeRef {
+  normalizedTime: number | null;
+  fetchedAt: number | null; // Date.now() at which normalizedTime was fetched
+}
+
+/**
+ * Returns the current normalized day/night time (0.0–1.0).
+ * If a server-synced time is available, extrapolates forward from the last
+ * fetch using elapsed wall-clock time so the sun position stays consistent
+ * across all connected clients.
+ * Falls back to local Date.now() if server sync has not yet succeeded.
+ */
+export const simulatePlanetTime = (serverRef?: ServerTimeRef): number => {
+  const cycleMs = DAY_CYCLE_MINUTES * 60 * 1000;
+
+  if (
+    serverRef !== undefined &&
+    serverRef.normalizedTime !== null &&
+    serverRef.fetchedAt !== null
+  ) {
+    const elapsedSinceFetch = Date.now() - serverRef.fetchedAt;
+    const elapsedFraction = elapsedSinceFetch / cycleMs;
+    return (serverRef.normalizedTime + elapsedFraction) % 1.0;
+  }
+
+  // Local fallback
+  const now = Date.now();
+  return (now % cycleMs) / cycleMs;
 };
 
-// Calculate the sun's direction vector based on the normalized time (0 to 1)
-export const getSunDirection = (normalizedTime: number) => {
-    // One full day is 2 * PI radians.
-    // Setting up the sun to rotate around the Y-axis (equatorial plane).
-    const angle = normalizedTime * Math.PI * 2;
-    
-    const x = Math.cos(angle);
-    const z = Math.sin(angle);
-    const y = 0.2; // slight offset so the sun isn't perfectly equatorial
-    
-    return [x, y, z];
+/**
+ * Returns the sun's direction vector as [x, y, z] for a given
+ * normalized time value (0.0–1.0 = one full day cycle).
+ */
+export const getSunDirection = (normalizedTime: number): [number, number, number] => {
+  const angle = normalizedTime * Math.PI * 2;
+  return [Math.cos(angle), 0.2, Math.sin(angle)];
+};
+
+/**
+ * Fetches the authoritative server-side normalized time from the API.
+ * Returns null on network failure (caller should keep the last known value).
+ */
+export const fetchServerTime = async (): Promise<{
+  normalizedTime: number;
+  fetchedAt: number;
+} | null> => {
+  try {
+    const res = await fetch('/api/world/time');
+    if (!res.ok) return null;
+    const data: { normalizedTime: number } = await res.json();
+    return { normalizedTime: data.normalizedTime, fetchedAt: Date.now() };
+  } catch {
+    return null;
+  }
 };
