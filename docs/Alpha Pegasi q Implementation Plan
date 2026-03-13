@@ -1,0 +1,103 @@
+# Alpha Pegasi q Implementation Plan
+
+## Goal Description
+Build the Alpha Pegasi q MVP — a persistent, scalable, browser-based digital world where AI agents live, interact, and establish an economy. This technical execution blueprint aligns our expansive free-tier SaaS ecosystem (Clerk, Supabase, RPGJS, OpenRouter) directly with the canonical MVP phases defined in the PRD.
+
+## Proposed Architecture Stack & Free-Tier Ecosystem
+
+- **Frontend & Backend APIs**: Next.js (App Router) hosted on Vercel.
+- **Styling**: Tailwind CSS + shadcn/ui.
+- **Database & Real-Time Sync**: Supabase (PostgreSQL + Realtime WebSockets).
+- **Authentication**: Clerk (JWTs injected directly into Supabase for RLS).
+- **Caching & Cron Jobs**: Upstash (Redis for state caching, QStash for daily economy cron jobs).
+- **AI LLM Routing**: OpenRouter (cheaper/free robust models like Llama 3/Mixtral).
+- **Transactional Emails**: Resend.
+- **Telemetry**: PostHog.
+- **3D Engine (Orbital View)**: Three.js via `react-three-fiber` + `@react-three/drei`.
+- **2D Engine (Settlement View)**: RPG JS (for WASD movement, camera, multiplayer sync) + Tiled (for map editing).
+
+## Exhaustive Data Schema (Supabase PostgreSQL)
+
+### 1. `users` Table
+- `id` (uuid, PK)
+- `clerk_id` (text, unique)
+- `tier` (text: 'visitor', 'explorer', 'steward')
+- `world_credits_balance` (integer, default 0)
+
+### 2. `agents` Table
+- `id` (uuid, PK)
+- `owner_id` (uuid, FK -> users.id)
+- `name` (text)
+- `biome` (text)
+- `home_tier` (integer)
+- `capabilities` (text[])
+- `reputation_score` (integer)
+- `system_prompt_context` (text)
+
+### 3. `interactions` Table
+- `id` (uuid, PK)
+- `agent_id` (uuid, FK -> agents.id)
+- `initiator_clerk_id` (text, FK -> users.clerk_id)
+- `message_history` (jsonb)
+- `sentiment_classification` (text)
+- `created_at` (timestamp)
+
+### 4. `world_credit_ledger` Table
+- `id` (uuid, PK)
+- `user_id` (uuid, FK -> users.id)
+- `amount` (integer)
+- `transaction_type` (text)
+- `created_at` (timestamp)
+
+---
+
+## Phased Execution Strategy (Aligned with PRD MVP Definition)
+
+### Phase 0 — Foundation
+**Scope:** Project scaffolding. Next.js + Three.js setup. Database schema. Authentication. Deployment pipeline.
+- Initialize Next.js (App Router) and deploy to Vercel.
+- Configure Clerk for authentication (Visitor, Explorer, Steward).
+- Set up Supabase PostgreSQL. Define tables and Row Level Security (RLS) linked via Clerk JWTs.
+- Establish centralized error logging and foundational UI (Tailwind GUI).
+
+### Phase 1 — The Planet
+**Scope:** 3D rotating sphere. 15 biome regions visible. Day/night cycle. Zoom transition.
+- Implement Three.js canvas with `SphereGeometry`.
+- Write custom GLSL shaders to texture the 15 biomes and render the day/night terminator line (synced to server time via Supabase).
+- Implement smooth camera pan/zoom into the Arboria biome trigger zone.
+
+### Phase 2 — Arboria
+**Scope:** 2D pixel-art regional map. First-person WASD settlement. Weather. Three demo agents.
+- Integrate the open-source **RPG JS** engine.
+- Use **Tiled** to visually design the Arboria settlement map (tiles, collision, lighting).
+- Hook up Supabase Realtime to broadcast live weather (rain, mist) down to the RPGJS client.
+- Place 3 static demo NPCs in the RPG JS map with interactive prompt boundaries.
+
+### Phase 3 — Agent Interaction
+**Scope:** Text conversation with agents. Interaction memory. Sentiment classification. Agent status.
+- Build the React Chat UI overlay that opens when interacting with an RPGJS NPC.
+- Construct the `Agent Communication Protocol` server-side API Gateway.
+- Proxy prompts through OpenRouter, dynamically injecting `world_state` (weather/time) and historical `interactions` (memory) retrieved from Supabase.
+- Store the new conversation logs and LLM sentiment analysis securely in DB.
+
+### Phase 4 — Economy & Accounts
+**Scope:** Stripe integration. World Credits. Steward account. Agent registration. Recommendations.
+- Build the Agent Registration Flow (Next.js forms).
+- Wire up Stripe webhooks to increment the user's `world_credits_balance` in Supabase.
+- Build Upstash QStash cron jobs to deduct property base rent daily.
+- Develop the "Biome Recommendation" engine logic.
+
+### Phase 5 — Polish & Launch
+**Scope:** Performance optimization. Mobile responsive shell. Admin panel.
+- WebGL profiling; assure Three.js maintains 60fps and RPGJS culling optimizes memory.
+- Wrap the UI gracefully for mobile touchscreen playability.
+- Build the internal Platform Governor Admin interface (reading directly from Supabase).
+- Deep security audit of RLS policies before soft launch.
+
+## Verification Plan
+
+### Automated/Manual Verification
+- **Framework Readiness**: Validate token pass-through from Clerk to Supabase and ensure RLS blocks unauthorized writes.
+- **Performance Profiling**: Use Chrome DevTools to ensure the Three.js canvas and RPG JS instances are heavily optimized.
+- **Agent Sandbox Testing**: Write server-side unit tests for the Agent Gateway to ensure prompts are properly hydrated and APIs hidden.
+- **Economy Integrity**: Test Stripe webhook idempotency and QStash chron triggers.
