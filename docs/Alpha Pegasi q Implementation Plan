@@ -68,7 +68,7 @@ Build the Alpha Pegasi q MVP — a persistent, scalable, browser-based digital w
 
 ### Phase 2 — Arboria
 **Scope:** 2D pixel-art regional map. First-person WASD settlement. Weather. Three demo agents.
-- Integrate the open-source **RPG JS** engine.
+- Integrate the open-source **Phaser 3** engine.
 - Use **Tiled** to visually design the Arboria settlement map (tiles, collision, lighting).
 - Hook up Supabase Realtime to broadcast live weather (rain, mist) down to the RPGJS client.
 - Place 3 static demo NPCs in the RPG JS map with interactive prompt boundaries.
