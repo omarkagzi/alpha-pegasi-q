@@ -1,0 +1,77 @@
+<h2>Phaser 3 Scene Architecture</h2>
+<p class="subtitle">How should we organize the Phaser game scenes for regional map and settlement?</p>
+
+<div style="margin: 2rem 0; padding: 2rem; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+  <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(255,255,255,0.4); margin-bottom: 1rem;">Decisions Locked In</div>
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <span style="padding: 0.4rem 0.8rem; background: rgba(101,138,67,0.15); border: 1px solid rgba(101,138,67,0.3); border-radius: 20px; font-size: 0.8rem; color: rgba(101,138,67,0.9);">Phaser 3 for both views</span>
+    <span style="padding: 0.4rem 0.8rem; background: rgba(212,135,10,0.15); border: 1px solid rgba(212,135,10,0.3); border-radius: 20px; font-size: 0.8rem; color: rgba(212,135,10,0.9);">Central Market Square</span>
+    <span style="padding: 0.4rem 0.8rem; background: rgba(100,149,237,0.15); border: 1px solid rgba(100,149,237,0.3); border-radius: 20px; font-size: 0.8rem; color: rgba(100,149,237,0.9);">16×16 tiles</span>
+    <span style="padding: 0.4rem 0.8rem; background: rgba(180,100,200,0.15); border: 1px solid rgba(180,100,200,0.3); border-radius: 20px; font-size: 0.8rem; color: rgba(180,100,200,0.9);">WorldCanvas wrapper (PRD §8.2)</span>
+  </div>
+</div>
+
+<!-- Scene diagram -->
+<div style="margin: 2rem 0; padding: 1.5rem; background: rgba(0,0,0,0.3); border-radius: 8px; font-family: monospace; font-size: 0.8rem; line-height: 1.8; color: rgba(255,255,255,0.6);">
+<pre style="margin: 0; white-space: pre-wrap;">
+Phaser.Game instance (single, long-lived)
+├── BootScene          — loads all assets (tilesets, sprites, UI)
+├── RegionMapScene     — Arboria regional overview map
+│   ├── Tiled tilemap (arboria-region.tmj)
+│   ├── Settlement markers (clickable)
+│   ├── Weather overlay layer
+│   └── Day/night tint overlay
+└── SettlementScene    — Arboria market town (walkable)
+    ├── Tiled tilemap (arboria-market-town.tmj)
+    ├── Player sprite (WASD movement)
+    ├── NPC agents at home locations
+    ├── Collision layer
+    ├── Interaction zones (proximity triggers)
+    ├── Weather particle effects
+    └── Day/night tint overlay
+</pre>
+</div>
+
+<h3>How should scene transitions work?</h3>
+
+<div class="options">
+  <div class="option" data-choice="scene-switch" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Scene Switch with Fade (Recommended)</h3>
+      <p>Use Phaser's built-in <code>scene.start('SettlementScene')</code> with a camera fade effect. The previous scene is stopped (not destroyed). Returning to the regional map restarts it. Simple, standard Phaser pattern.</p>
+      <p style="color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 0.5rem;">Flow: RegionMap → fade out → SettlementScene loads → fade in. Press M → fade out → RegionMap restarts → fade in.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="parallel-scenes" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Parallel Scenes (Both Alive)</h3>
+      <p>Both RegionMap and Settlement scenes run simultaneously. One is active + visible, the other is paused + hidden. Toggle between them. Preserves state in both directions — your position on the regional map is remembered.</p>
+      <p style="color: rgba(255,255,255,0.4); font-size: 0.8rem; margin-top: 0.5rem;">Flow: RegionMap (active) → scene.sleep('RegionMapScene') + scene.wake('SettlementScene'). Press M → reverse.</p>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 2rem;">
+  <h3>Demo Agents (3 NPCs for MVP)</h3>
+  <p class="subtitle">These are placed at fixed home locations in the market town. Their data comes from Supabase.</p>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+    <div style="padding: 1.25rem; background: rgba(101,138,67,0.08); border: 1px solid rgba(101,138,67,0.2); border-radius: 8px;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">🏠</div>
+      <h3 style="color: rgba(101,138,67,0.9); margin: 0 0 0.25rem;">Personal Assistant</h3>
+      <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 0;">General-purpose helper. North side of market square. Friendly, approachable.</p>
+    </div>
+    <div style="padding: 1.25rem; background: rgba(100,149,237,0.08); border: 1px solid rgba(100,149,237,0.2); border-radius: 8px;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">📚</div>
+      <h3 style="color: rgba(100,149,237,0.9); margin: 0 0 0.25rem;">Research Agent</h3>
+      <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 0;">Knowledge retrieval and summarization. East side, near the park. Scholarly.</p>
+    </div>
+    <div style="padding: 1.25rem; background: rgba(212,135,10,0.08); border: 1px solid rgba(212,135,10,0.2); border-radius: 8px;">
+      <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">💼</div>
+      <h3 style="color: rgba(212,135,10,0.9); margin: 0 0 0.25rem;">Commerce Agent</h3>
+      <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 0;">Trade and commerce advice. South side, near the shops. Business-minded.</p>
+    </div>
+  </div>
+</div>

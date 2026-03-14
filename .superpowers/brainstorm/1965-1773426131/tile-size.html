@@ -1,0 +1,50 @@
+<h2>Tile Size & Art Scale</h2>
+<p class="subtitle">This decision affects map dimensions, sprite resolution, asset sourcing, and overall visual density.</p>
+
+<div class="options">
+  <div class="option" data-choice="16px" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>16×16 Tiles (Recommended)</h3>
+      <p>Classic retro pixel art. Kenney.nl's 1-Bit pack and many free CC0 tilesets are 16px native. Map would be ~60×50 tiles (960×800px base, scaled up 2-3x). Very Stardew-like feel. Smallest file sizes. Most tileset options available.</p>
+      <div style="margin-top: 0.5rem; display: flex; gap: 1rem; font-size: 0.75rem; color: rgba(255,255,255,0.4);">
+        <span>Map: ~60×50 tiles</span>
+        <span>Render scale: 3x</span>
+        <span>Viewport: ~320×240 base</span>
+      </div>
+    </div>
+  </div>
+  <div class="option" data-choice="32px" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>32×32 Tiles</h3>
+      <p>More detailed pixel art. LPC (Universal Spritesheet Generator) sprites are 64×64 which pairs well with 32px tiles. Map would be ~30×25 tiles (960×800px base, scaled up 1.5-2x). More space for building detail. Fewer free tilesets available at this resolution.</p>
+      <div style="margin-top: 0.5rem; display: flex; gap: 1rem; font-size: 0.75rem; color: rgba(255,255,255,0.4);">
+        <span>Map: ~30×25 tiles</span>
+        <span>Render scale: 2x</span>
+        <span>Viewport: ~480×360 base</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 2rem; padding: 1.5rem; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+  <h3 style="color: rgba(255,255,255,0.7); margin-top: 0;">Asset Pipeline (from PRD)</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+    <div style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 6px;">
+      <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); margin-bottom: 0.5rem;">Ground & Structures</div>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;"><strong>Kenney.nl</strong> (CC0)</p>
+      <p style="color: rgba(255,255,255,0.4); font-size: 0.75rem; margin: 0.25rem 0 0;">Free tileset packs, consistent style</p>
+    </div>
+    <div style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 6px;">
+      <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); margin-bottom: 0.5rem;">Character Sprites</div>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;"><strong>LPC Spritesheet Gen</strong></p>
+      <p style="color: rgba(255,255,255,0.4); font-size: 0.75rem; margin: 0.25rem 0 0;">64×64 walk/idle/interact cycles</p>
+    </div>
+    <div style="padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 6px;">
+      <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: rgba(255,255,255,0.3); margin-bottom: 0.5rem;">Editing & Palette</div>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; margin: 0;"><strong>LibreSprite</strong></p>
+      <p style="color: rgba(255,255,255,0.4); font-size: 0.75rem; margin: 0.25rem 0 0;">32-color palette unification</p>
+    </div>
+  </div>
+</div>

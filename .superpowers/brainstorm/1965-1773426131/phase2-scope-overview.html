@@ -1,0 +1,86 @@
+<h2>Phase 2 — Arboria: Scope Overview</h2>
+<p class="subtitle">Phase 2 has 4 major subsystems. Let's confirm the scope before diving into each.</p>
+
+<div style="margin: 2rem 0; padding: 2rem; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+
+    <!-- Subsystem 1 -->
+    <div style="padding: 1.5rem; background: rgba(101,138,67,0.1); border: 1px solid rgba(101,138,67,0.3); border-radius: 8px;">
+      <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(101,138,67,0.7); margin-bottom: 0.5rem;">Subsystem 1</div>
+      <h3 style="color: #658a43; margin: 0 0 0.5rem 0;">Canvas Orchestration</h3>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; line-height: 1.5; margin: 0;">
+        Three.js ↔ Phaser 3 renderer switching. Both initialized on load. Fade transitions between orbital view and 2D game view. Neither destroyed — only hidden/paused.
+      </p>
+      <div style="margin-top: 0.75rem; font-size: 0.75rem; color: rgba(255,255,255,0.3);">Files: WorldCanvas wrapper, PlanetCanvas updates</div>
+    </div>
+
+    <!-- Subsystem 2 -->
+    <div style="padding: 1.5rem; background: rgba(212,135,10,0.1); border: 1px solid rgba(212,135,10,0.3); border-radius: 8px;">
+      <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(212,135,10,0.7); margin-bottom: 0.5rem;">Subsystem 2</div>
+      <h3 style="color: #d4870a; margin: 0 0 0.5rem 0;">Regional Map (2D)</h3>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; line-height: 1.5; margin: 0;">
+        Pixel-art overview map of the Arboria biome. Shows terrain, settlement markers (village/town/city), travel paths. Point-and-click navigation. Weather overlay. Day/night lighting.
+      </p>
+      <div style="margin-top: 0.75rem; font-size: 0.75rem; color: rgba(255,255,255,0.3);">Files: RegionMap, Tiled .tmj, weatherEngine</div>
+    </div>
+
+    <!-- Subsystem 3 -->
+    <div style="padding: 1.5rem; background: rgba(100,149,237,0.1); border: 1px solid rgba(100,149,237,0.3); border-radius: 8px;">
+      <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(100,149,237,0.7); margin-bottom: 0.5rem;">Subsystem 3</div>
+      <h3 style="color: #6495ed; margin: 0 0 0.5rem 0;">Settlement View (Phaser 3)</h3>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; line-height: 1.5; margin: 0;">
+        Top-down WASD walkable settlement. Tiled tilemap rendered by Phaser 3. Collision layers, NPC agent sprites at home locations, interaction zones, camera follow. The core playable experience.
+      </p>
+      <div style="margin-top: 0.75rem; font-size: 0.75rem; color: rgba(255,255,255,0.3);">Files: SettlementCanvas, Phaser scene, Tiled .tmj</div>
+    </div>
+
+    <!-- Subsystem 4 -->
+    <div style="padding: 1.5rem; background: rgba(180,100,200,0.1); border: 1px solid rgba(180,100,200,0.3); border-radius: 8px;">
+      <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(180,100,200,0.7); margin-bottom: 0.5rem;">Subsystem 4</div>
+      <h3 style="color: #b464c8; margin: 0 0 0.5rem 0;">Weather & Lighting</h3>
+      <p style="color: rgba(255,255,255,0.6); font-size: 0.85rem; line-height: 1.5; margin: 0;">
+        Biome-specific weather state machine (clear, rain, mist, overcast). Day/night cycle overlay on both regional map and settlement view. Seasonal visual changes (autumn leaves, spring blossoms).
+      </p>
+      <div style="margin-top: 0.75rem; font-size: 0.75rem; color: rgba(255,255,255,0.3);">Files: weatherEngine, seasonEngine, lighting overlays</div>
+    </div>
+  </div>
+</div>
+
+<!-- Flow diagram -->
+<div style="margin: 2rem 0; padding: 1.5rem; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+  <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(255,255,255,0.4); margin-bottom: 1rem;">Navigation Flow</div>
+  <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.9rem; flex-wrap: wrap;">
+    <span style="padding: 0.5rem 1rem; background: rgba(255,255,255,0.05); border-radius: 6px; color: rgba(255,255,255,0.7);">🌍 Orbital View<br><span style="font-size:0.7rem;color:rgba(255,255,255,0.3);">Three.js</span></span>
+    <span style="color: rgba(255,255,255,0.3);">→ click biome →</span>
+    <span style="padding: 0.5rem 1rem; background: rgba(212,135,10,0.15); border-radius: 6px; color: rgba(212,135,10,0.8);">🗺️ Regional Map<br><span style="font-size:0.7rem;color:rgba(255,255,255,0.3);">Canvas 2D or Phaser</span></span>
+    <span style="color: rgba(255,255,255,0.3);">→ click settlement →</span>
+    <span style="padding: 0.5rem 1rem; background: rgba(100,149,237,0.15); border-radius: 6px; color: rgba(100,149,237,0.8);">🏘️ Settlement View<br><span style="font-size:0.7rem;color:rgba(255,255,255,0.3);">Phaser 3</span></span>
+  </div>
+</div>
+
+<h3 style="margin-top: 2rem;">Key Decision Point</h3>
+<p class="subtitle">The Regional Map sits between the orbital view and the settlement. How should we render it?</p>
+
+<div class="options">
+  <div class="option" data-choice="phaser-both" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Phaser 3 for Both (Recommended)</h3>
+      <p>Use Phaser 3 for both the regional map AND the settlement view. One engine, one canvas. The regional map is a separate Phaser scene — click a settlement marker to transition to the settlement scene. Simplest architecture, single Phaser instance serves both views.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="canvas-region" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>HTML Canvas for Regional, Phaser for Settlement</h3>
+      <p>Regional map is a lightweight HTML5 Canvas or even a React component with CSS. Only the settlement view uses Phaser 3. Lighter weight, but adds a third rendering context to manage.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="react-region" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>React DOM for Regional, Phaser for Settlement</h3>
+      <p>Regional map built entirely in React with styled components, SVG markers, and CSS animations for weather. Settlement view uses Phaser 3. Most "web-native" approach, easiest to style, but pixel-art aesthetic harder to achieve.</p>
+    </div>
+  </div>
+</div>

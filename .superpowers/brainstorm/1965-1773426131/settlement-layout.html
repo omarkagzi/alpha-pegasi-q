@@ -1,0 +1,75 @@
+<h2>Arboria Market Town — Settlement Layout</h2>
+<p class="subtitle">This is the first (and only MVP) walkable settlement. How should it be structured?</p>
+
+<!-- ASCII map mockups -->
+<div class="cards">
+
+  <div class="card" data-choice="central-square" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 1.5rem; font-family: monospace; font-size: 0.65rem; line-height: 1.4; white-space: pre; color: rgba(101,138,67,0.9); background: rgba(0,0,0,0.3);">
+ ┌──────────────────────────────────┐
+ │  🌳🌳    PATH     🌳🌳          │
+ │  🌳   ┌──────────┐   🌳         │
+ │       │  MARKET   │    🏠 Agent1 │
+ │  🏠   │  SQUARE   │    🏠 Agent2 │
+ │  NPC  │  (open)   │              │
+ │       └──────────┘    🏠 Agent3 │
+ │  🌳    PATH    PATH    🌳       │
+ │     🏠          🏠              │
+ │   Shop        Tavern    🌳🌳    │
+ │  🌳🌳    PARK AREA     🌳🌳    │
+ └──────────────────────────────────┘</div>
+    <div class="card-body">
+      <h3>A: Central Market Square</h3>
+      <p>Classic layout. Open market square at center, agent homes radiating outward. Park area to the south. Paths connect all areas. Player spawns at north entrance. Simple, readable, easy to navigate.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="districts" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 1.5rem; font-family: monospace; font-size: 0.65rem; line-height: 1.4; white-space: pre; color: rgba(100,149,237,0.9); background: rgba(0,0,0,0.3);">
+ ┌──────────────────────────────────┐
+ │ RESIDENTIAL    │   MARKET        │
+ │  🏠 Agent1     │  ┌────────┐    │
+ │  🏠 Agent2     │  │ Stalls │    │
+ │  🌳 Garden     │  │ Plaza  │    │
+ │────────────────┼──┘        │    │
+ │ COMMONS        │  └────────┘    │
+ │  🌳 Park 🌳    │                │
+ │  ⛲ Fountain   │   CRAFT ROW    │
+ │  🌳 Benches    │  🏠 Agent3     │
+ │                │  🏠 Workshop   │
+ └──────────────────────────────────┘</div>
+    <div class="card-body">
+      <h3>B: Distinct Districts</h3>
+      <p>Town divided into named districts: Residential, Market, Commons (park), Craft Row. Each area has its own character. More complex to navigate but feels like a real town. Supports future expansion — add new districts as agents register.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="main-street" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding: 1.5rem; font-family: monospace; font-size: 0.65rem; line-height: 1.4; white-space: pre; color: rgba(212,135,10,0.9); background: rgba(0,0,0,0.3);">
+ ┌──────────────────────────────────┐
+ │  🌳🌳  GATE  🌳🌳               │
+ │        ║                        │
+ │  🏠 ═══╬═══ 🏠                  │
+ │ Agent1 ║   Agent2               │
+ │        ║                        │
+ │  🏠 ═══╬═══ 🏠                  │
+ │  Shop  ║   Agent3               │
+ │        ║                        │
+ │  🌳 ═══╬═══ 🌳                  │
+ │  Park  ║   Tavern               │
+ │        ║                        │
+ │  🌳🌳 SQUARE 🌳🌳               │
+ └──────────────────────────────────┘</div>
+    <div class="card-body">
+      <h3>C: Main Street Linear</h3>
+      <p>One main road from gate to square, with buildings on both sides. Most linear and guided experience — hard to get lost. Very Stardew Valley. But less room for exploration and feels smaller.</p>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top: 1.5rem; padding: 1rem; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+  <p style="color: rgba(255,255,255,0.5); font-size: 0.8rem; margin: 0;">
+    <strong>Note:</strong> The MVP needs exactly 3 demo agent homes + ambient buildings (shop, tavern, etc.) + park/green space. The map will be authored in Tiled and exported as .tmj for Phaser 3. Approximate target size: 40×30 tiles at 16px or 32px per tile.
+  </p>
+</div>

@@ -1,11 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useThree, useFrame } from "@react-three/fiber";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { getNearestBiome } from "@/engine/planet/biomePositions";
 import { Biome } from "@/types/biome";
+import { useWorldStore } from "@/stores/worldStore";
 
 interface ZoomTransitionProps {
   planetMeshRef: React.RefObject<THREE.Mesh | null>;
@@ -20,7 +20,7 @@ export default function ZoomTransition({
   onBiomeClick,
   onZoomStart,
 }: ZoomTransitionProps) {
-  const router = useRouter();
+  const enterBiome = useWorldStore((s) => s.enterBiome);
   const { gl, camera } = useThree();
 
   const isZooming = useRef(false);
@@ -129,7 +129,8 @@ export default function ZoomTransition({
 
     if (progress >= 1.0) {
       isZooming.current = false;
-      router.push("/world/arboria");
+      // Signal WorldCanvas to transition from Three.js to Phaser
+      enterBiome("temperate_deciduous_forest");
     }
   });
 

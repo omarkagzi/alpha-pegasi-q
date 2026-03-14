@@ -1,16 +1,20 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useEffect } from "react";
+import { useWorldStore } from "@/stores/worldStore";
 
-// Dynamically import the Three.js canvas so it doesn't break SSR
-const PlanetCanvas = dynamic(() => import("@/components/planet/PlanetCanvas"), {
-  ssr: false,
-});
-
+/**
+ * /world page — signals WorldCanvas to show the orbital (Three.js) view.
+ * The actual rendering is handled by WorldCanvas in the layout.
+ */
 export default function WorldPage() {
-  return (
-    <main className="w-full h-full relative">
-      <PlanetCanvas />
-    </main>
-  );
+  const returnToOrbit = useWorldStore((s) => s.returnToOrbit);
+
+  useEffect(() => {
+    // Ensure orbital view is active when this page mounts
+    returnToOrbit();
+  }, [returnToOrbit]);
+
+  // No visible content — WorldCanvas renders the planet
+  return null;
 }

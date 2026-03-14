@@ -1,0 +1,58 @@
+<h2>Phaser 3 ↔ React Integration Architecture</h2>
+<p class="subtitle">This is the trickiest part of Phase 2. Phaser owns its own DOM element and game loop. How do we wire it into the Next.js React app?</p>
+
+<div style="margin: 2rem 0; padding: 2rem; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.08);">
+  <div style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.15em; color: rgba(255,255,255,0.4); margin-bottom: 1rem;">Canvas Orchestration (from PRD §8.2)</div>
+
+  <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+    <div style="padding: 1rem 1.5rem; background: rgba(255,165,0,0.1); border: 1px solid rgba(255,165,0,0.3); border-radius: 8px; text-align: center;">
+      <div style="color: rgba(255,165,0,0.8); font-weight: 600;">Three.js Canvas</div>
+      <div style="color: rgba(255,255,255,0.3); font-size: 0.75rem;">Orbital planet view</div>
+      <div style="color: rgba(255,255,255,0.3); font-size: 0.7rem; margin-top: 0.25rem;">Already built (Phase 1)</div>
+    </div>
+    <div style="color: rgba(255,255,255,0.2); font-size: 1.5rem;">⟷</div>
+    <div style="padding: 1rem 1.5rem; background: rgba(101,138,67,0.15); border: 2px solid rgba(101,138,67,0.4); border-radius: 8px; text-align: center;">
+      <div style="color: rgba(101,138,67,0.9); font-weight: 600;">WorldCanvas Wrapper</div>
+      <div style="color: rgba(255,255,255,0.3); font-size: 0.75rem;">Owns both lifecycles</div>
+      <div style="color: rgba(255,255,255,0.3); font-size: 0.7rem; margin-top: 0.25rem;">NEW — Phase 2</div>
+    </div>
+    <div style="color: rgba(255,255,255,0.2); font-size: 1.5rem;">⟷</div>
+    <div style="padding: 1rem 1.5rem; background: rgba(100,149,237,0.1); border: 1px solid rgba(100,149,237,0.3); border-radius: 8px; text-align: center;">
+      <div style="color: rgba(100,149,237,0.8); font-weight: 600;">Phaser 3 Canvas</div>
+      <div style="color: rgba(255,255,255,0.3); font-size: 0.75rem;">Regional map + Settlement</div>
+      <div style="color: rgba(255,255,255,0.3); font-size: 0.7rem; margin-top: 0.25rem;">NEW — Phase 2</div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="route-based" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Route-Based Separation (Recommended)</h3>
+      <p>Three.js lives at <code>/world</code>. Phaser lives at <code>/world/arboria</code> and <code>/world/arboria/[settlement]</code>. Each route mounts its own renderer. No shared wrapper needed — Next.js routing handles the switch. Phaser is dynamically imported and initialized when the Arboria route mounts, destroyed on unmount.</p>
+      <div class="pros-cons" style="margin-top: 0.75rem;">
+        <div class="pros"><h4>Pros</h4><ul><li>Cleanest separation of concerns</li><li>No complex state orchestration</li><li>Each view manages its own lifecycle</li><li>Works naturally with Next.js App Router</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>~300-500ms Phaser cold start on first navigation</li><li>Full page transition (not seamless fade)</li><li>Phaser state lost if user navigates away and back</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="worldcanvas-wrapper" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>WorldCanvas Wrapper (PRD Spec)</h3>
+      <p>A parent <code>&lt;WorldCanvas&gt;</code> component at the <code>/world</code> layout level pre-initializes both Three.js and Phaser on load. Both canvases exist simultaneously — one hidden, one visible. Fade transitions between them. Neither is destroyed.</p>
+      <div class="pros-cons" style="margin-top: 0.75rem;">
+        <div class="pros"><h4>Pros</h4><ul><li>Zero transition lag (both pre-loaded)</li><li>Seamless visual transitions</li><li>Matches PRD §8.2 exactly</li><li>Phaser state preserved across navigation</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Higher initial memory footprint</li><li>More complex lifecycle management</li><li>Must coordinate two game loops</li><li>Harder to debug</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 1.5rem; padding: 1rem; background: rgba(212,135,10,0.08); border: 1px solid rgba(212,135,10,0.2); border-radius: 8px;">
+  <p style="color: rgba(212,135,10,0.8); font-size: 0.85rem; margin: 0;">
+    <strong>My recommendation:</strong> Option A (route-based) for MVP. The PRD specifies the WorldCanvas wrapper, but that's an optimization. For MVP with just Arboria, the cold-start delay is acceptable and the simpler architecture will save significant development time. We can refactor to the WorldCanvas wrapper in a later phase when more biomes are realized and instant transitions matter.
+  </p>
+</div>
