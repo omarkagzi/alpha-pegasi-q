@@ -21,11 +21,11 @@ This document breaks down the actionable tasks for building the Alpha Pegasi q M
 
 ## Phase 2: Arboria
 *2D pixel-art regional map. First-person WASD settlement. Weather. Three demo agents.*
-- [ ] Integrate RPG JS engine into the Next.js shell
-- [ ] Use Tiled editor to design the Arboria layout, tiles, and collision maps
-- [ ] Load the Tiled map into RPG JS and enable WASD player controls
-- [ ] Connect Supabase Realtime to broadcast biome weather/lighting to engine
-- [ ] Place the 3 static demo NPCs in the Arboria settlement map
+- [x] Integrate RPG JS engine into the Next.js shell
+- [x] Use Tiled editor to design the Arboria layout, tiles, and collision maps
+- [x] Load the Tiled map into RPG JS and enable WASD player controls
+- [x] Connect Supabase Realtime to broadcast biome weather/lighting to engine
+- [x] Place the 3 static demo NPCs in the Arboria settlement map
 
 ## Phase 3: Agent Interaction
 *Text conversation with agents. Interaction memory. Sentiment classification.*
