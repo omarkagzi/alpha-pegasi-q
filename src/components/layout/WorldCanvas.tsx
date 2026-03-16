@@ -87,12 +87,29 @@ export default function WorldCanvas() {
     prevView.current = activeView;
   }, [activeView, fadeTo]);
 
-  // Initially pause Phaser since we start in orbital view
+  // Initially pause Phaser once boot completes (event-driven, not timeout)
   useEffect(() => {
-    // Small delay to let Phaser finish initializing
-    const timer = setTimeout(() => {
-      phaserRef.current?.pause();
-    }, 500);
+    const checkAndPause = () => {
+      const game = phaserRef.current?.getGame();
+      if (!game) return;
+
+      // Check if boot already completed
+      if (game.registry.get("bootComplete")) {
+        phaserRef.current?.pause();
+        return;
+      }
+
+      // Wait for bootComplete event
+      game.events.once("bootComplete", () => {
+        // Only pause if we're still in orbital view
+        if (useWorldStore.getState().activeView === "orbital") {
+          phaserRef.current?.pause();
+        }
+      });
+    };
+
+    // Brief delay to let Phaser.Game instance initialize
+    const timer = setTimeout(checkAndPause, 100);
     return () => clearTimeout(timer);
   }, []);
 

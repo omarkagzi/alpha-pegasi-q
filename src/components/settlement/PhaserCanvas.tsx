@@ -10,6 +10,9 @@ export interface PhaserCanvasHandle {
   resume: () => void;
 }
 
+// Module-level singleton — prevents double-init in React StrictMode
+let phaserGameInstance: Phaser.Game | null = null;
+
 /**
  * PhaserCanvas — mounts and owns the Phaser.Game instance.
  * The game is created once on mount and never destroyed (per PRD §8.2).
@@ -44,16 +47,27 @@ const PhaserCanvas = forwardRef<PhaserCanvasHandle>(function PhaserCanvas(_, ref
   }));
 
   useEffect(() => {
-    if (!containerRef.current || gameRef.current) return;
+    if (!containerRef.current) return;
+
+    // Reuse existing singleton if available (StrictMode remount)
+    if (phaserGameInstance) {
+      gameRef.current = phaserGameInstance;
+      // Re-parent the canvas if needed
+      const canvas = phaserGameInstance.canvas;
+      if (canvas && canvas.parentElement !== containerRef.current) {
+        containerRef.current.appendChild(canvas);
+      }
+      return;
+    }
 
     const config = createPhaserConfig(containerRef.current);
-    gameRef.current = new Phaser.Game(config);
+    phaserGameInstance = new Phaser.Game(config);
+    gameRef.current = phaserGameInstance;
 
     // Don't destroy on unmount — game persists per PRD §8.2
-    // Cleanup only on full app teardown
     return () => {
-      // Intentionally not destroying the game here.
-      // The WorldCanvas wrapper manages the lifecycle.
+      // Only null the local ref, not the singleton
+      gameRef.current = null;
     };
   }, []);
 

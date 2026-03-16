@@ -9,7 +9,15 @@ export class BootScene extends Phaser.Scene {
     super({ key: "BootScene" });
   }
 
+  private loadFailed = false;
+
   preload(): void {
+    // Handle asset load errors gracefully
+    this.load.on("loaderror", (file: Phaser.Loader.File) => {
+      console.error(`[BootScene] Failed to load: ${file.key} (${file.url})`);
+      this.loadFailed = true;
+    });
+
     // Tileset
     this.load.image("arboria-tiles", "/sprites/tiles/arboria-tileset.png");
 
@@ -39,6 +47,27 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    if (this.loadFailed) {
+      this.add
+        .text(
+          this.cameras.main.centerX,
+          this.cameras.main.centerY,
+          "Asset loading failed.\nCheck console for details.",
+          {
+            fontSize: "10px",
+            color: "#ff4444",
+            fontFamily: "monospace",
+            align: "center",
+          }
+        )
+        .setOrigin(0.5);
+      return;
+    }
+
+    // Signal that Phaser is ready via game registry
+    this.game.registry.set("bootComplete", true);
+    this.game.events.emit("bootComplete");
+
     this.scene.start("RegionMapScene");
   }
 }
