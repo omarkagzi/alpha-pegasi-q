@@ -1,0 +1,158 @@
+# Alpha Pegasi q Implementation Plan
+**Version 2.0 — March 2026**
+
+## Goal Description
+Build the Alpha Pegasi q MVP — a persistent, scalable, browser-based digital world where AI agents live, interact, and establish an economy. This technical execution blueprint aligns our expansive free-tier SaaS ecosystem (Clerk, Supabase, Phaser 3, OpenRouter) directly with the canonical MVP phases defined in the PRD (v2.0).
+
+## Proposed Architecture Stack & Free-Tier Ecosystem
+
+- **Frontend & Backend APIs**: Next.js (App Router) hosted on Vercel.
+- **Styling**: Tailwind CSS + shadcn/ui.
+- **Database & Real-Time Sync**: Supabase (PostgreSQL + Realtime WebSockets).
+- **Authentication**: Clerk (JWTs injected directly into Supabase for RLS).
+- **Caching & Cron Jobs**: Upstash (Redis for state caching, QStash for daily economy cron jobs).
+- **AI LLM Routing**: OpenRouter (free-tier models: Gemini Flash, DeepSeek R1, Qwen Coder, Llama 4 Scout). *(Version 2 — specific model assignments per platform agent)*
+- **Transactional Emails**: Resend.
+- **Telemetry**: PostHog.
+- **3D Engine (Orbital View)**: Three.js via `react-three-fiber` + `@react-three/drei`.
+- **2D Engine (Settlement View)**: Phaser 3 (for WASD movement, camera, tile-based rendering) + Tiled (for map editing). *(Version 2 — corrected from RPG JS to match PRD v1.1+)*
+- **Asset Packs**: Kenney Tiny Town + Tiny Dungeon (tiles, buildings, characters), Kenney UI Pack Pixel Adventure (warm theme), Kenney UI Audio (SFX). All CC0. *(Version 2)*
+
+## Exhaustive Data Schema (Supabase PostgreSQL)
+
+### 1. `users` Table
+- `id` (uuid, PK)
+- `clerk_id` (text, unique)
+- `tier` (text: 'visitor', 'explorer', 'steward')
+- `world_credits_balance` (integer, default 0)
+
+### 2. `agents` Table
+- `id` (uuid, PK)
+- `owner_id` (uuid, FK -> users.id)
+- `name` (text)
+- `biome` (text)
+- `home_tier` (integer)
+- `capabilities` (text[])
+- `reputation_score` (integer)
+- `system_prompt_context` (text)
+- `model_id` (text) — OpenRouter model identifier *(Version 2)*
+- `personality_prompt` (text) — full system prompt for agent personality *(Version 2)*
+- `zone` (text) — district within the settlement *(Version 2)*
+- `sprite_key` (text) — character sprite atlas identifier *(Version 2)*
+- `is_platform_owned` (boolean, default false) — true for platform agents *(Version 2)*
+
+### 3. `interactions` Table
+- `id` (uuid, PK)
+- `agent_id` (uuid, FK -> agents.id)
+- `initiator_clerk_id` (text, FK -> users.clerk_id)
+- `message_history` (jsonb)
+- `sentiment_classification` (text)
+- `created_at` (timestamp)
+
+### 4. `world_credit_ledger` Table
+- `id` (uuid, PK)
+- `user_id` (uuid, FK -> users.id)
+- `amount` (integer)
+- `transaction_type` (text)
+- `created_at` (timestamp)
+
+### 5. `properties` Table *(Version 2)*
+- `id` (uuid, PK)
+- `agent_id` (uuid, FK -> agents.id)
+- `biome` (text)
+- `settlement` (text)
+- `tier` (integer)
+- `monthly_rent_wc` (integer)
+- `purchased` (boolean, default false)
+- `lot_x` (integer) — tile X coordinate of the lot's top-left corner
+- `lot_y` (integer) — tile Y coordinate of the lot's top-left corner
+- `house_style` (text) — one of: 'small_red', 'small_blue', 'small_gray', 'large_red', 'large_blue', 'large_gray'
+- `sprite_key` (text) — sprite identifier from the character sprite atlas
+- `created_at` (timestamp)
+
+---
+
+## Phased Execution Strategy (Aligned with PRD MVP Definition)
+
+### Phase 0 — Foundation
+**Scope:** Project scaffolding. Next.js + Three.js setup. Database schema. Authentication. Deployment pipeline.
+- Initialize Next.js (App Router) and deploy to Vercel.
+- Configure Clerk for authentication (Visitor, Explorer, Steward).
+- Set up Supabase PostgreSQL. Define tables and Row Level Security (RLS) linked via Clerk JWTs.
+- Establish centralized error logging and foundational UI (Tailwind GUI).
+
+### Phase 1 — The Planet
+**Scope:** 3D rotating sphere. 15 biome regions visible. Day/night cycle. Zoom transition.
+- Implement Three.js canvas with `SphereGeometry`.
+- Write custom GLSL shaders to texture the 15 biomes and render the day/night terminator line (synced to server time via Supabase).
+- Implement smooth camera pan/zoom into the Arboria biome trigger zone.
+
+### Phase 2 — Arboria
+**Scope:** 2D pixel-art regional map. Top-down WASD settlement. Weather. Three demo agents.
+- Integrate the open-source **Phaser 3** engine.
+- Use **Tiled** to visually design the Arboria settlement map (tiles, collision, lighting).
+- Hook up Supabase Realtime to broadcast live weather (rain, mist) down to the Phaser 3 client.
+- Place 3 static demo NPCs in the Phaser 3 map with interactive prompt boundaries.
+
+### Phase 2.5 — Arboria Visual Reimagining *(Version 2)*
+**Scope:** Replace all placeholder art with production-quality Kenney pixel art. Expand agent roster. Add ambient world population. Implement claimable lot system. Audio. UI reskin.
+
+**Visual Assets & Map**
+- Replace placeholder tileset with Kenney Tiny Town `tilemap_packed.png` (16x16 tiles, CC0).
+- Redesign Arboria Market Town map in Tiled: 64x64 tiles (up from 50x50), 5 named districts (Town Gate, Market Square, Scholar's Quarter, Craftsmen's Row, Commons Park).
+- Build combined character sprite atlas (`characters.png` + `characters.json`) from Kenney Tiny Town + Tiny Dungeon character pools.
+- Replace player sprite and all NPC sprites with unique, visually distinct Kenney characters.
+
+**Platform Agents (3 → 5)**
+- Expand from 3 demo agents to 5 platform agents: Mira (guide), Ledger (finance), Archon (academia), Forge (programming), Ember (roleplay).
+- Assign each agent a specific free-tier OpenRouter model: Gemini Flash, Gemini Flash Lite, DeepSeek R1, Qwen Coder, Llama 4 Scout.
+- Write personality system prompts for each agent with world-aware context injection.
+- Replace seed migration `0006_seed_agents.sql` with new `0007_platform_agents.sql`.
+
+**Ambient NPCs (12)**
+- Implement `ambientNpcManager.ts` — 12 non-AI NPCs with static positions, idle animation, and proximity-triggered speech bubbles.
+- Each NPC has 3 pre-written lines referencing agents, biomes, credits, and seasons.
+- No name labels, no "Press E" prompts — visual distinction from AI agents.
+
+**Claimable Lots (18)**
+- Implement `lotManager.ts` — runtime tile patching system for Steward-claimed lots.
+- 18 empty lots (5x5 tiles each) distributed across districts, rendered as fenced grass with signposts when unclaimed.
+- On scene load, query `properties` table and patch tilemap layers with claimed house tiles and agent sprites.
+
+**Audio**
+- Implement `audioManager.ts` — load Kenney UI Audio SFX in BootScene.
+- 7 trigger types: proximity chime, panel open/close, button click, message received, hover, NPC bubble pop.
+- Global mute toggle persisted in localStorage. Default volume 30%.
+
+**UI Reskin**
+- Re-skin settlement HUD, interaction prompts, and breadcrumb with Kenney UI Pack Pixel Adventure (warm/parchment theme).
+- Design chat overlay and agent registration UI components (implemented in Phases 3 and 4 respectively).
+
+### Phase 3 — Agent Interaction
+**Scope:** Text conversation with agents. Interaction memory. Sentiment classification. Agent status.
+- Build the React Chat UI overlay (pixel art themed per Phase 2.5 design) that opens when interacting with a Phaser 3 NPC.
+- Construct the `Agent Communication Protocol` server-side API Gateway.
+- Proxy prompts through OpenRouter, dynamically injecting `world_state` (weather/time) and historical `interactions` (memory) retrieved from Supabase.
+- Store the new conversation logs and LLM sentiment analysis securely in DB.
+
+### Phase 4 — Economy & Accounts
+**Scope:** Stripe integration. World Credits. Steward account. Agent registration. Recommendations.
+- Build the Agent Registration Flow (Next.js forms) with sprite picker, house style picker, and lot selector (pixel art themed per Phase 2.5 design). *(Version 2)*
+- Wire up Stripe webhooks to increment the user's `world_credits_balance` in Supabase.
+- Build Upstash QStash cron jobs to deduct property base rent daily.
+- Develop the "Biome Recommendation" engine logic.
+
+### Phase 5 — Polish & Launch
+**Scope:** Performance optimization. Mobile responsive shell. Admin panel.
+- WebGL profiling; assure Three.js maintains 60fps and Phaser 3 culling optimizes memory.
+- Wrap the UI gracefully for mobile touchscreen playability.
+- Build the internal Platform Governor Admin interface (reading directly from Supabase).
+- Deep security audit of RLS policies before soft launch.
+
+## Verification Plan
+
+### Automated/Manual Verification
+- **Framework Readiness**: Validate token pass-through from Clerk to Supabase and ensure RLS blocks unauthorized writes.
+- **Performance Profiling**: Use Chrome DevTools to ensure the Three.js canvas and Phaser 3 instances are heavily optimized.
+- **Agent Sandbox Testing**: Write server-side unit tests for the Agent Gateway to ensure prompts are properly hydrated and APIs hidden.
+- **Economy Integrity**: Test Stripe webhook idempotency and QStash chron triggers.
