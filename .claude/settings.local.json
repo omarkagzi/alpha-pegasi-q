@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e \":*)"
+      "Bash(node -e \":*)",
+      "Bash(npx tsx:*)",
+      "Bash(node -e \"const m = require\\(''./public/maps/arboria/arboria-market-town.json''\\); console.log\\(''Size:'', m.width, ''x'', m.height\\); console.log\\(''Layers:'', m.layers.map\\(l => l.name\\).join\\('', ''\\)\\); console.log\\(''Tileset:'', m.tilesets[0].name\\); console.log\\(''Objects:'', m.layers.find\\(l => l.type===''objectgroup''\\).objects.length\\);\")"
     ]
   }
 }
