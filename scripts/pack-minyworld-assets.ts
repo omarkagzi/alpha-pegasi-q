@@ -1,0 +1,86 @@
+// scripts/pack-minyworld-assets.ts
+/**
+ * Copies selected MinyWorld + Puny World assets from Design Assets/ to public/sprites/.
+ * Run: npx tsx scripts/pack-minyworld-assets.ts
+ */
+import * as fs from "fs";
+import * as path from "path";
+
+const ROOT = path.resolve(__dirname, "..");
+const DESIGN = path.join(ROOT, "Design Assets");
+const MINY = path.join(DESIGN, "MinyWorld Assets", "MiniWorldSprites");
+const PUNY = path.join(DESIGN, "Puny World Assets");
+const PUBLIC = path.join(ROOT, "public", "sprites");
+
+interface CopyEntry {
+  src: string;
+  dest: string;
+}
+
+const entries: CopyEntry[] = [
+  // Terrain tileset
+  { src: path.join(PUNY, "punyworld-overworld-tileset.png"), dest: path.join(PUBLIC, "tiles", "punyworld-overworld-tileset.png") },
+
+  // Buildings (Wood base — no color tint for MVP)
+  { src: path.join(MINY, "Buildings", "Wood", "Houses.png"), dest: path.join(PUBLIC, "buildings", "houses.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Huts.png"), dest: path.join(PUBLIC, "buildings", "huts.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Taverns.png"), dest: path.join(PUBLIC, "buildings", "taverns.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Market.png"), dest: path.join(PUBLIC, "buildings", "market.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Workshops.png"), dest: path.join(PUBLIC, "buildings", "workshops.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Keep.png"), dest: path.join(PUBLIC, "buildings", "keep.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Tower.png"), dest: path.join(PUBLIC, "buildings", "tower.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Barracks.png"), dest: path.join(PUBLIC, "buildings", "barracks.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Chapels.png"), dest: path.join(PUBLIC, "buildings", "chapels.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Resources.png"), dest: path.join(PUBLIC, "buildings", "resources.png") },
+  { src: path.join(MINY, "Buildings", "Wood", "Docks.png"), dest: path.join(PUBLIC, "buildings", "docks.png") },
+
+  // Nature
+  { src: path.join(MINY, "Nature", "Trees.png"), dest: path.join(PUBLIC, "nature", "trees.png") },
+  { src: path.join(MINY, "Nature", "PineTrees.png"), dest: path.join(PUBLIC, "nature", "pine-trees.png") },
+  { src: path.join(MINY, "Nature", "Rocks.png"), dest: path.join(PUBLIC, "nature", "rocks.png") },
+  { src: path.join(MINY, "Nature", "Wheatfield.png"), dest: path.join(PUBLIC, "nature", "wheatfield.png") },
+  { src: path.join(MINY, "Nature", "DeadTrees.png"), dest: path.join(PUBLIC, "nature", "dead-trees.png") },
+
+  // Miscellaneous
+  { src: path.join(MINY, "Miscellaneous", "Well.png"), dest: path.join(PUBLIC, "misc", "well.png") },
+  { src: path.join(MINY, "Miscellaneous", "Bridge.png"), dest: path.join(PUBLIC, "misc", "bridge.png") },
+  { src: path.join(MINY, "Miscellaneous", "Signs.png"), dest: path.join(PUBLIC, "misc", "signs.png") },
+  { src: path.join(MINY, "Miscellaneous", "Chests.png"), dest: path.join(PUBLIC, "misc", "chests.png") },
+  { src: path.join(MINY, "Miscellaneous", "QuestBoard.png"), dest: path.join(PUBLIC, "misc", "quest-board.png") },
+  { src: path.join(MINY, "Miscellaneous", "Tombstones.png"), dest: path.join(PUBLIC, "misc", "tombstones.png") },
+
+  // Characters (Champions for agents, Farmer for player)
+  { src: path.join(MINY, "Characters", "Champions", "Arthax.png"), dest: path.join(PUBLIC, "characters", "arthax.png") },
+  { src: path.join(MINY, "Characters", "Champions", "Kanji.png"), dest: path.join(PUBLIC, "characters", "kanji.png") },
+  { src: path.join(MINY, "Characters", "Champions", "Katan.png"), dest: path.join(PUBLIC, "characters", "katan.png") },
+  { src: path.join(MINY, "Characters", "Champions", "Okomo.png"), dest: path.join(PUBLIC, "characters", "okomo.png") },
+  { src: path.join(MINY, "Characters", "Champions", "Zhinja.png"), dest: path.join(PUBLIC, "characters", "zhinja.png") },
+  { src: path.join(MINY, "Characters", "Workers", "FarmerTemplate.png"), dest: path.join(PUBLIC, "characters", "farmer.png") },
+
+  // Animals
+  { src: path.join(MINY, "Animals", "Sheep.png"), dest: path.join(PUBLIC, "animals", "sheep.png") },
+  { src: path.join(MINY, "Animals", "Chicken.png"), dest: path.join(PUBLIC, "animals", "chicken.png") },
+];
+
+let copied = 0;
+let failed = 0;
+
+for (const entry of entries) {
+  const destDir = path.dirname(entry.dest);
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+
+  if (!fs.existsSync(entry.src)) {
+    console.error(`MISSING: ${entry.src}`);
+    failed++;
+    continue;
+  }
+
+  fs.copyFileSync(entry.src, entry.dest);
+  console.log(`  OK: ${path.relative(ROOT, entry.dest)}`);
+  copied++;
+}
+
+console.log(`\nDone: ${copied} copied, ${failed} failed.`);
+if (failed > 0) process.exit(1);
