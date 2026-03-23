@@ -32,9 +32,9 @@ export class SettlementScene extends Phaser.Scene {
     // 1. Load tilemap
     const map = this.make.tilemap({ key: "arboria-market-town" });
 
-    // 2. Add tileset — bridge the Phaser load key ("arboria-tiles") with the
-    //    Tiled JSON tileset name ("arboria-tileset")
-    const tileset = map.addTilesetImage("arboria-tileset", "arboria-tiles");
+    // 2. Add tileset — bridge the Phaser load key ("kenney-tiny-town") with the
+    //    Tiled JSON tileset name ("kenney-tiny-town")
+    const tileset = map.addTilesetImage("kenney-tiny-town", "kenney-tiny-town");
 
     if (!tileset) {
       console.error("[SettlementScene] Failed to add tileset");
@@ -95,7 +95,7 @@ export class SettlementScene extends Phaser.Scene {
 
     // 8. Get NPC objects and create NPC manager
     const npcObjects = objectLayer
-      ? objectLayer.objects.filter((o) => o.type === "npc")
+      ? objectLayer.objects.filter((o) => o.type === "agent")
       : [];
 
     this.npcManager = new NpcManager(
