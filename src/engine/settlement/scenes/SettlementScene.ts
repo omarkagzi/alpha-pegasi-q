@@ -1,12 +1,14 @@
 import Phaser from "phaser";
 import { PlayerController } from "../playerController";
 import { NpcManager } from "../npcManager";
+import { BuildingManager } from "../buildingManager";
 import { useWorldStore } from "@/stores/worldStore";
 import { WeatherEngine } from "@/engine/region/weatherEngine";
 import { LightingEngine } from "@/engine/region/lightingEngine";
 import { WeatherEffects } from "../weatherEffects";
 import { getSeasonTint } from "@/engine/region/seasonEngine";
 import { supabaseAnon } from "@/lib/supabase/anonClient";
+import { TERRAIN, TILEMAP } from "../assetManifest";
 
 /**
  * SettlementScene — top-down WASD walkable view of Arboria market town.
@@ -16,6 +18,7 @@ import { supabaseAnon } from "@/lib/supabase/anonClient";
 export class SettlementScene extends Phaser.Scene {
   private playerController!: PlayerController;
   private npcManager!: NpcManager;
+  private buildingManager!: BuildingManager;
   private lightingEngine!: LightingEngine;
   private weatherEffects!: WeatherEffects;
   private transitioning = false;
@@ -30,11 +33,10 @@ export class SettlementScene extends Phaser.Scene {
     this.transitioning = false;
 
     // 1. Load tilemap
-    const map = this.make.tilemap({ key: "arboria-market-town" });
+    const map = this.make.tilemap({ key: TILEMAP.key });
 
-    // 2. Add tileset — bridge the Phaser load key ("kenney-tiny-town") with the
-    //    Tiled JSON tileset name ("kenney-tiny-town")
-    const tileset = map.addTilesetImage("kenney-tiny-town", "kenney-tiny-town");
+    // 2. Add Puny World tileset
+    const tileset = map.addTilesetImage(TERRAIN.key, TERRAIN.key);
 
     if (!tileset) {
       console.error("[SettlementScene] Failed to add tileset");
@@ -49,62 +51,56 @@ export class SettlementScene extends Phaser.Scene {
       return;
     }
 
-    // 3. Create visible layers
+    // 3. Create terrain layers
     const groundLayer = map.createLayer("ground", tileset);
-    const buildingsLayer = map.createLayer("buildings", tileset);
-    const decorationsLayer = map.createLayer("decorations", tileset);
+    const pathsLayer = map.createLayer("paths", tileset);
 
-    // Set depth ordering
     groundLayer?.setDepth(0);
-    buildingsLayer?.setDepth(1);
-    decorationsLayer?.setDepth(2);
+    pathsLayer?.setDepth(1);
 
-    // 4. Create collision layer (invisible)
+    // 4. Collision layer (invisible)
     const collisionLayer = map.createLayer("collisions", tileset);
     if (collisionLayer) {
       collisionLayer.setVisible(false);
-      // Tile index 7 = wall/collision tiles; 0 = empty
       collisionLayer.setCollisionByExclusion([-1, 0]);
     }
 
-    // 5. Get spawn point from interactions object layer
+    // 5. Get object layer
     const objectLayer = map.getObjectLayer("interactions");
-    let spawnX = 464;
-    let spawnY = 32;
+    let spawnX = 49 * 16;
+    let spawnY = 65 * 16;
 
     if (objectLayer) {
-      const spawnObj = objectLayer.objects.find(
-        (o) => o.type === "player_spawn"
-      );
-      if (spawnObj && spawnObj.x !== undefined && spawnObj.y !== undefined) {
+      const spawnObj = objectLayer.objects.find((o) => o.type === "player_spawn");
+      if (spawnObj?.x !== undefined && spawnObj?.y !== undefined) {
         spawnX = spawnObj.x;
         spawnY = spawnObj.y;
       }
     }
 
-    // 6. Create player controller at spawn point
+    // 6. Create buildings from object layer
+    const buildingObjects = objectLayer
+      ? objectLayer.objects.filter((o) => o.type === "building")
+      : [];
+    this.buildingManager = new BuildingManager(this, buildingObjects);
+
+    // 7. Create player
     this.playerController = new PlayerController(this, spawnX, spawnY);
 
-    // 7. Set collisions between player and collision layer
+    // 8. Collisions — player vs tile collision layer + building sprites
     if (collisionLayer) {
-      this.physics.add.collider(
-        this.playerController.sprite,
-        collisionLayer
-      );
+      this.physics.add.collider(this.playerController.sprite, collisionLayer);
     }
+    this.physics.add.collider(
+      this.playerController.sprite,
+      this.buildingManager.getCollisionGroup()
+    );
 
-    // 8. Get NPC objects and create NPC manager
+    // 9. NPCs
     const npcObjects = objectLayer
       ? objectLayer.objects.filter((o) => o.type === "agent")
       : [];
-
-    this.npcManager = new NpcManager(
-      this,
-      npcObjects,
-      this.playerController.sprite
-    );
-
-    // 8b. Fetch agent data from Supabase and enrich NPCs (fire-and-forget)
+    this.npcManager = new NpcManager(this, npcObjects, this.playerController.sprite);
     this.fetchAndEnrichAgents();
 
     // 9. Set camera bounds to map dimensions
@@ -123,7 +119,7 @@ export class SettlementScene extends Phaser.Scene {
     weatherEngine.start();
 
     // Track layers for dynamic season tint updates
-    this.tintedLayers = [groundLayer, decorationsLayer].filter(
+    this.tintedLayers = [groundLayer, pathsLayer].filter(
       (l): l is Phaser.Tilemaps.TilemapLayer => l !== null
     );
 
@@ -219,18 +215,11 @@ export class SettlementScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
-    if (this.lightingEngine) {
-      this.lightingEngine.destroy();
-    }
-    if (this.weatherEffects) {
-      this.weatherEffects.destroy();
-    }
-    if (this.npcManager) {
-      this.npcManager.destroy();
-    }
-    if (this.playerController) {
-      this.playerController.destroy();
-    }
+    if (this.lightingEngine) this.lightingEngine.destroy();
+    if (this.weatherEffects) this.weatherEffects.destroy();
+    if (this.buildingManager) this.buildingManager.destroy();
+    if (this.npcManager) this.npcManager.destroy();
+    if (this.playerController) this.playerController.destroy();
     useWorldStore.getState().setNearbyAgent(null);
   }
 }

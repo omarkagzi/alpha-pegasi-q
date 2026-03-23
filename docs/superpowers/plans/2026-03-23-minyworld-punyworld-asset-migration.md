@@ -1521,3 +1521,678 @@ git commit -m "chore: verified MinyWorld + Puny World migration renders correctl
 | 12 | Runtime Smoke Test | Tasks 4-9 all complete |
 
 **Parallelizable:** Tasks 1, 10 can run immediately. Tasks 4, 5, 7, 8 can run in parallel after Task 1. Task 3 can run after Task 2. Task 12 must be last code task.
+
+---
+
+## Chunk 5: Map Generator Enhancement (Task 3 v2)
+
+> **Context:** The MVP map generator (Task 3) produces a functional but visually sparse settlement. Comparing to the MinyWorld reference maps (`Design Assets/MinyWorld Assets/Example-maps-and-layouts/1DNf6A.png`), the current output is missing dense forests, organic paths, proper river bank transitions, terrain biome variation, decorative objects, and tight building clustering. This chunk rewrites the terrain/decoration generation in `generate-settlement-map.ts` to match the visual richness of the inspiration maps.
+
+### What's Missing — Gap Analysis
+
+| # | Element | Inspiration Map | Current Generator |
+|---|---------|----------------|-------------------|
+| 1 | **Dense forests** | Thick tree clusters ring the town, scattered copses throughout. Uses Wang tree tiles (color 6) for proper forest canopy with edge transitions | Thin sparse border at map edges using 5 single tree GIDs. No Wang edge transitions. No interior forest clusters |
+| 2 | **Organic path network** | Winding dirt roads branch, curve, and connect organically to buildings and districts. Multiple path widths. Intersections use proper Wang corner tiles | Rigid N-S and E-W cross using only `DIRT_VERT` and `DIRT_HORIZ`. No curves, no branching, no connection to buildings |
+| 3 | **River bank transitions** | Rivers use Wang corner tiles (color 7): outer corners, edge tiles, inner corners for concave bends. Smooth grass→bank→water transitions | 3-tile-wide solid `WATER_C` with no edge tiles. Harsh cyan rectangles against grass |
+| 4 | **Terrain biome zones** | Multiple grass shades form natural clusters — dark meadows, light clearings. Coherent zones, not per-tile noise | Random per-tile grass variant selection creates visual static instead of natural zones |
+| 5 | **Building density** | 40-60+ buildings tightly packed in a town center with organic non-grid layout. Alleys and courtyards emerge naturally | 27 buildings on a sparse grid. Too spread out. Feels empty |
+| 6 | **Decorative objects** | Rocks, wheat fields, flower patches, fences scattered throughout. Every area has visual interest | Zero decoration sprites placed. Wheat, rocks, chests, tombstones loaded but never used |
+| 7 | **Farm/crop areas** | Organized wheat fields and farmland near settlement edges | Wheatfield spritesheet loaded but never placed |
+| 8 | **Road-to-building connection** | Paths lead TO buildings, connecting districts organically | Paths are independent of building placement — buildings float on grass |
+| 9 | **Multiple forest types** | Mix of deciduous and pine trees creating varied forest character | Only Puny World tree tile variants used. No MinyWorld tree sprites |
+| 10 | **Terrain transitions** | Grass→dirt areas around buildings/paths using Wang dirt tiles (color 2). Sand near water using Wang sand tiles (color 3) | No terrain transitions except paths overlay |
+
+### Corrected Puny World GID Reference
+
+The current PW constants have naming errors for river tiles. The correct Wang corner mappings (verified against `.tsx` wangid values) are:
+
+**Wang corner system:** `wangid="0,TR,0,BR,0,BL,0,TL"` — only corner positions matter for corner-type wangsets. Color 1=grass, 7=river.
+
+```
+River body layout (tiles form a rectangular water area):
+
+  OUTER_TL  OUTER_T   OUTER_TR     ← grass above, water below
+  OUTER_L   CENTER    OUTER_R      ← grass on sides, water in middle
+  OUTER_BL  OUTER_B   OUTER_BR     ← water above, grass below
+```
+
+```typescript
+// CORRECTED river GIDs (GID = tileId + 1):
+RIVER_OUTER_TL: 278,  // tileId 277 — TR=1,BR=7,BL=1,TL=1 (water starts at bottom-right)
+RIVER_OUTER_T:  279,  // tileId 278 — TR=1,BR=7,BL=7,TL=1 (water below, grass above)
+RIVER_OUTER_TR: 280,  // tileId 279 — TR=1,BR=1,BL=7,TL=1 (water starts at bottom-left)
+RIVER_INNER_TL: 281,  // tileId 280 — TR=7,BR=7,BL=7,TL=1 (concave: grass only at TL)
+RIVER_INNER_TR: 282,  // tileId 281 — TR=1,BR=7,BL=7,TL=7 (concave: grass only at TR)
+RIVER_OUTER_L:  305,  // tileId 304 — TR=7,BR=7,BL=1,TL=1 (water right, grass left)
+RIVER_CENTER:   306,  // tileId 305 — TR=7,BR=7,BL=7,TL=7 (full water)
+RIVER_OUTER_R:  307,  // tileId 306 — TR=1,BR=1,BL=7,TL=7 (water left, grass right)
+RIVER_INNER_BL: 308,  // tileId 307 — TR=7,BR=7,BL=1,TL=7 (concave: grass only at BL)
+RIVER_INNER_BR: 309,  // tileId 308 — TR=7,BR=1,BL=7,TL=7 (concave: grass only at BR)
+RIVER_OUTER_BL: 332,  // tileId 331 — TR=7,BR=1,BL=1,TL=1 (water above-right only)
+RIVER_OUTER_B:  333,  // tileId 332 — TR=7,BR=1,BL=1,TL=7 (water above, grass below)
+RIVER_OUTER_BR: 334,  // tileId 333 — TR=1,BR=1,BL=1,TL=7 (water above-left only)
+```
+
+**Wang tree tiles (color 6 on air/5 base) — for forest canopy overlay in paths layer:**
+
+```typescript
+// Forest canopy tiles — place in paths layer to create dense forests
+FOREST_OUTER_TL: 190,  // tileId 189 — forest starts at BR corner
+FOREST_OUTER_T:  191,  // tileId 190 — forest below, air above
+FOREST_OUTER_TR: 192,  // tileId 191 — forest starts at BL corner
+FOREST_INNER_TL: 193,  // tileId 192 — air only at TL (concave)
+FOREST_INNER_TR: 194,  // tileId 193 — air only at TR (concave)
+FOREST_OUTER_L:  217,  // tileId 216 — forest right, air left
+FOREST_CENTER:   218,  // tileId 217 — full forest canopy
+FOREST_OUTER_R:  219,  // tileId 218 — forest left, air right
+FOREST_INNER_BL: 223,  // tileId 222 — air only at BL (concave)
+FOREST_INNER_BR: 224,  // tileId 223 — air only at BR (concave)
+FOREST_OUTER_BL: 244,  // tileId 243 — forest above-right only
+FOREST_OUTER_B:  245,  // tileId 244 — forest above, air below
+FOREST_OUTER_BR: 246,  // tileId 245 — forest above-left only
+FOREST_V_STRIP:  250,  // tileId 249 — vertical 1-wide forest
+FOREST_H_STRIP:  251,  // tileId 250 — horizontal 1-wide forest
+```
+
+**Wang trees2 tiles (color 12 on air/5 base) — second forest type (pine/brown):**
+
+```typescript
+FOREST2_OUTER_TL: 202,  // tileId 201
+FOREST2_OUTER_T:  203,  // tileId 202
+FOREST2_OUTER_TR: 204,  // tileId 203
+FOREST2_INNER_TL: 205,  // tileId 204
+FOREST2_INNER_TR: 206,  // tileId 205
+FOREST2_OUTER_L:  226,  // tileId 225 (row below)
+FOREST2_CENTER:   227,  // tileId 226
+FOREST2_OUTER_R:  228,  // tileId 227
+FOREST2_INNER_BL: 232,  // tileId 231
+FOREST2_INNER_BR: 233,  // tileId 232
+FOREST2_OUTER_BL: 253,  // tileId 252
+FOREST2_OUTER_B:  254,  // tileId 253
+FOREST2_OUTER_BR: 255,  // tileId 254
+FOREST2_V_STRIP:  259,  // tileId 258
+FOREST2_H_STRIP:  260,  // tileId 259
+```
+
+**Dirt-on-grass Wang tiles (color 2 on grass/1 base) — for dirt patches around buildings:**
+
+```typescript
+// Dirt terrain patches — place in ground layer to create worn areas around buildings
+DIRT_OUTER_TL: 11,   // tileId 10 — dirt starts at BR
+DIRT_OUTER_T:  12,   // tileId 11 — dirt below
+DIRT_OUTER_TR: 13,   // tileId 12 — dirt starts at BL
+DIRT_INNER_TL: 14,   // tileId 13 — concave (grass only at TL)
+DIRT_INNER_TR: 15,   // tileId 14 — concave (grass only at TR)
+DIRT_OUTER_L:  38,   // tileId 37 — dirt right
+DIRT_FULL:     39,   // tileId 38 — full dirt
+DIRT_OUTER_R:  40,   // tileId 39 — dirt left
+DIRT_INNER_BL: 41,   // tileId 40 — concave (grass only at BL)
+DIRT_INNER_BR: 42,   // tileId 41 — concave (grass only at BR)
+DIRT_OUTER_BL: 65,   // tileId 64 — dirt above-right
+DIRT_OUTER_B:  66,   // tileId 65 — dirt above
+DIRT_OUTER_BR: 67,   // tileId 66 — dirt above-left
+DIRT_V_STRIP:  68,   // tileId 67 — vertical 1-wide dirt
+DIRT_H_STRIP:  69,   // tileId 68 — horizontal 1-wide dirt
+```
+
+---
+
+### Task 13: Rewrite Map Generator — Terrain Biomes & Forest Canopy
+
+**Files:**
+- Modify: `scripts/generate-settlement-map.ts`
+
+**Overview:** Replace the simplistic terrain generation (random grass, straight paths, bare water, thin tree border) with noise-based biome zones, Wang-tiled forest canopy, and proper river bank transitions.
+
+- [ ] **Step 1: Add simplex noise function**
+
+Add a 2D value noise implementation (no dependencies) at the top of the file, after the PW constants. This creates smooth, natural-looking zones instead of per-tile randomness.
+
+```typescript
+// ── Simplex-like 2D noise (self-contained, no deps) ──────────────
+// Returns values in range [0, 1] for coordinates (x, y).
+// Scale controls zoom level — lower = larger blobs.
+function noise2D(x: number, y: number, scale: number = 0.05): number {
+  const nx = x * scale;
+  const ny = y * scale;
+  // Multiple octaves of seeded hash for organic feel
+  let val = 0;
+  let amp = 1;
+  let freq = 1;
+  let maxAmp = 0;
+  for (let o = 0; o < 4; o++) {
+    val += amp * hashNoise(nx * freq, ny * freq);
+    maxAmp += amp;
+    amp *= 0.5;
+    freq *= 2;
+  }
+  return (val / maxAmp + 1) / 2; // Normalize to [0, 1]
+}
+
+function hashNoise(x: number, y: number): number {
+  // Deterministic pseudo-random based on coords
+  const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+  const n2 = Math.sin(x * 269.5 + y * 183.3) * 28001.8384;
+  return Math.sin(n + n2);
+}
+```
+
+- [ ] **Step 2: Replace grass generation with biome zones**
+
+Replace the current grass loop (section 1) with noise-based grass clustering:
+
+```typescript
+// ── 1. GROUND LAYER — Noise-based grass biomes ───────────────────
+// Group similar grass variants into "biome" clusters using noise.
+// Low noise → dark grass (variants 1-3), high noise → light grass (variants 6-8).
+const darkGrass = [PW.GRASS_1, PW.GRASS_2, PW.GRASS_3];
+const midGrass = [PW.GRASS_4, PW.GRASS_5];
+const lightGrass = [PW.GRASS_6, PW.GRASS_7, PW.GRASS_8];
+
+for (let y = 0; y < MAP_H; y++) {
+  for (let x = 0; x < MAP_W; x++) {
+    const n = noise2D(x, y, 0.06);
+    let pool: number[];
+    if (n < 0.35) pool = darkGrass;
+    else if (n < 0.65) pool = midGrass;
+    else pool = lightGrass;
+    ground[idx(x, y)] = pool[Math.floor(rand() * pool.length)];
+  }
+}
+```
+
+- [ ] **Step 3: Rewrite river with Wang bank transitions**
+
+Replace the current river (section 2) with a wider, sinusoidal river using proper edge GIDs. First, paint the river body into a boolean grid, then resolve each tile's Wang variant by checking its 4 neighbors:
+
+```typescript
+// ── 2. RIVER — Sinusoidal with Wang bank transitions ─────────────
+// Step A: Paint river body into a boolean grid
+const isWater: boolean[] = new Array(MAP_W * MAP_H).fill(false);
+
+for (let i = 0; i < 95; i++) {
+  // River flows from upper-left to lower-right with sine curves
+  const rx = Math.floor(12 + i * 0.85 + Math.sin(i * 0.12) * 6);
+  const ry = Math.floor(3 + i * 1.0);
+  if (ry >= MAP_H - 3) break;
+  // River width varies 3-5 tiles
+  const width = 2 + Math.floor(Math.sin(i * 0.08) + 1.5);
+  for (let w = -width; w <= width; w++) {
+    const wx = rx + w;
+    if (wx >= 0 && wx < MAP_W && ry >= 0 && ry < MAP_H) {
+      isWater[idx(wx, ry)] = true;
+    }
+  }
+}
+
+// Step B: Resolve each water-adjacent tile using Wang corners
+// Wang corner convention: check if each corner's diagonal neighbor is water
+for (let y = 0; y < MAP_H; y++) {
+  for (let x = 0; x < MAP_W; x++) {
+    if (!isWater[idx(x, y)] && !hasWaterNeighbor(x, y)) continue;
+
+    // Get corner states: is the terrain at each corner "water"?
+    const tl = isW(x - 1, y - 1) && isW(x - 1, y) && isW(x, y - 1);
+    const tr = isW(x + 1, y - 1) && isW(x + 1, y) && isW(x, y - 1);
+    const bl = isW(x - 1, y + 1) && isW(x - 1, y) && isW(x, y + 1);
+    const br = isW(x + 1, y + 1) && isW(x + 1, y) && isW(x, y + 1);
+
+    const gid = resolveRiverWang(tl, tr, bl, br);
+    if (gid > 0) {
+      setTile(ground, x, y, gid);
+      setTile(collisions, x, y, COLLISION);
+    }
+  }
+}
+```
+
+Add helper functions:
+
+```typescript
+function isW(x: number, y: number): boolean {
+  if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return false;
+  return isWater[idx(x, y)];
+}
+
+function hasWaterNeighbor(x: number, y: number): boolean {
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++)
+      if (isW(x + dx, y + dy)) return true;
+  return false;
+}
+
+function resolveRiverWang(tl: boolean, tr: boolean, bl: boolean, br: boolean): number {
+  const key = (tl ? 8 : 0) | (tr ? 4 : 0) | (bl ? 2 : 0) | (br ? 1 : 0);
+  // Map 4-bit corner mask to river GIDs
+  const WANG_MAP: Record<number, number> = {
+    0b1111: PW.RIVER_CENTER,     // all water
+    0b0011: PW.RIVER_OUTER_T,    // water below only
+    0b1100: PW.RIVER_OUTER_B,    // water above only
+    0b0101: PW.RIVER_OUTER_L,    // water right only
+    0b1010: PW.RIVER_OUTER_R,    // water left only
+    0b0001: PW.RIVER_OUTER_TL,   // water only at BR
+    0b0010: PW.RIVER_OUTER_TR,   // water only at BL
+    0b0100: PW.RIVER_OUTER_BL,   // water only at TR
+    0b1000: PW.RIVER_OUTER_BR,   // water only at TL
+    0b1110: PW.RIVER_INNER_TL,   // grass only at BR → wait, inverted...
+    0b1101: PW.RIVER_INNER_TR,   // grass only at BL
+    0b1011: PW.RIVER_INNER_BL,   // grass only at TR
+    0b0111: PW.RIVER_INNER_BR,   // grass only at TL
+    // Strips
+    0b0110: PW.RIVER_OUTER_T,    // approximate
+    0b1001: PW.RIVER_OUTER_B,    // approximate
+  };
+  return WANG_MAP[key] || 0;
+}
+```
+
+- [ ] **Step 4: Add dense forest clusters using Wang tree tiles**
+
+Replace the thin tree border (section 4) with noise-driven forest zones. Use the Wang forest canopy tiles (color 6) for deciduous and trees2 (color 12) for pine forests:
+
+```typescript
+// ── 4. FORESTS — Noise-driven clusters with Wang canopy tiles ────
+// Step A: Generate forest density map using noise
+const isForest: boolean[] = new Array(MAP_W * MAP_H).fill(false);
+
+for (let y = 0; y < MAP_H; y++) {
+  for (let x = 0; x < MAP_W; x++) {
+    const distFromCenter = Math.sqrt((x - 50) ** 2 + (y - 50) ** 2);
+    const distFromEdge = Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y);
+    const forestNoise = noise2D(x + 200, y + 200, 0.07);
+
+    // Dense forest near edges, sparse toward center, avoid town core
+    const edgeBias = distFromEdge < 15 ? 0.7 - distFromEdge * 0.03 : 0;
+    const centerPenalty = distFromCenter < 20 ? 0.6 : 0;
+
+    // Also add scattered copses in mid-distance
+    const copseNoise = noise2D(x + 500, y + 500, 0.12);
+    const copseChance = copseNoise > 0.7 && distFromCenter > 25 ? 0.5 : 0;
+
+    const threshold = Math.max(edgeBias, copseChance) - centerPenalty;
+
+    if (forestNoise > (1 - threshold) && !isWater[idx(x, y)]) {
+      isForest[idx(x, y)] = true;
+    }
+  }
+}
+
+// Step B: Resolve Wang forest canopy tiles
+// Uses same corner-resolution approach as river
+for (let y = 0; y < MAP_H; y++) {
+  for (let x = 0; x < MAP_W; x++) {
+    if (!isForest[idx(x, y)] && !hasForestNeighbor(x, y)) continue;
+
+    const tl = isF(x - 1, y - 1) && isF(x - 1, y) && isF(x, y - 1);
+    const tr = isF(x + 1, y - 1) && isF(x + 1, y) && isF(x, y - 1);
+    const bl = isF(x - 1, y + 1) && isF(x - 1, y) && isF(x, y + 1);
+    const br = isF(x + 1, y + 1) && isF(x + 1, y) && isF(x, y + 1);
+
+    // Use trees2 (pine) for northern half, trees1 (deciduous) for southern
+    const usePine = noise2D(x + 800, y + 800, 0.04) > 0.55;
+    const gid = resolveForestWang(tl, tr, bl, br, usePine);
+    if (gid > 0) {
+      setTile(paths, x, y, gid);
+      setTile(collisions, x, y, COLLISION);
+    }
+  }
+}
+```
+
+Add forest helper functions (same pattern as river):
+
+```typescript
+function isF(x: number, y: number): boolean {
+  if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return false;
+  return isForest[idx(x, y)];
+}
+
+function hasForestNeighbor(x: number, y: number): boolean {
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++)
+      if (isF(x + dx, y + dy)) return true;
+  return false;
+}
+
+function resolveForestWang(tl: boolean, tr: boolean, bl: boolean, br: boolean, pine: boolean): number {
+  const key = (tl ? 8 : 0) | (tr ? 4 : 0) | (bl ? 2 : 0) | (br ? 1 : 0);
+  if (key === 0) return 0;
+
+  // Select tile set based on forest type
+  const F = pine ? {
+    CENTER: PW.FOREST2_CENTER, OUTER_TL: PW.FOREST2_OUTER_TL,
+    OUTER_T: PW.FOREST2_OUTER_T, OUTER_TR: PW.FOREST2_OUTER_TR,
+    OUTER_L: PW.FOREST2_OUTER_L, OUTER_R: PW.FOREST2_OUTER_R,
+    OUTER_BL: PW.FOREST2_OUTER_BL, OUTER_B: PW.FOREST2_OUTER_B,
+    OUTER_BR: PW.FOREST2_OUTER_BR, INNER_TL: PW.FOREST2_INNER_TL,
+    INNER_TR: PW.FOREST2_INNER_TR, INNER_BL: PW.FOREST2_INNER_BL,
+    INNER_BR: PW.FOREST2_INNER_BR,
+  } : {
+    CENTER: PW.FOREST_CENTER, OUTER_TL: PW.FOREST_OUTER_TL,
+    OUTER_T: PW.FOREST_OUTER_T, OUTER_TR: PW.FOREST_OUTER_TR,
+    OUTER_L: PW.FOREST_OUTER_L, OUTER_R: PW.FOREST_OUTER_R,
+    OUTER_BL: PW.FOREST_OUTER_BL, OUTER_B: PW.FOREST_OUTER_B,
+    OUTER_BR: PW.FOREST_OUTER_BR, INNER_TL: PW.FOREST_INNER_TL,
+    INNER_TR: PW.FOREST_INNER_TR, INNER_BL: PW.FOREST_INNER_BL,
+    INNER_BR: PW.FOREST_INNER_BR,
+  };
+
+  const WANG_MAP: Record<number, number> = {
+    0b1111: F.CENTER,
+    0b0011: F.OUTER_T,  0b1100: F.OUTER_B,
+    0b0101: F.OUTER_L,  0b1010: F.OUTER_R,
+    0b0001: F.OUTER_TL, 0b0010: F.OUTER_TR,
+    0b0100: F.OUTER_BL, 0b1000: F.OUTER_BR,
+    0b1110: F.INNER_TL, 0b1101: F.INNER_TR,
+    0b1011: F.INNER_BL, 0b0111: F.INNER_BR,
+    0b0110: F.OUTER_T,  0b1001: F.OUTER_B, // approximations
+    0b0011: F.OUTER_T,  // horizontal strip fallback
+  };
+  return WANG_MAP[key] || F.CENTER;
+}
+```
+
+- [ ] **Step 5: Update PW constants with corrected GIDs**
+
+Replace the incorrect WATER_TL/T/TR/etc constants and add forest + dirt terrain GIDs:
+
+```typescript
+// Replace existing water constants with:
+// River (Wang color 7 on grass/1 base)
+RIVER_OUTER_TL: 278,  RIVER_OUTER_T:  279,  RIVER_OUTER_TR: 280,
+RIVER_INNER_TL: 281,  RIVER_INNER_TR: 282,
+RIVER_OUTER_L:  305,  RIVER_CENTER:   306,  RIVER_OUTER_R:  307,
+RIVER_INNER_BL: 308,  RIVER_INNER_BR: 309,
+RIVER_OUTER_BL: 332,  RIVER_OUTER_B:  333,  RIVER_OUTER_BR: 334,
+
+// Forest canopy — trees type 1 (Wang color 6 on air/5)
+FOREST_OUTER_TL: 190, FOREST_OUTER_T: 191, FOREST_OUTER_TR: 192,
+FOREST_INNER_TL: 193, FOREST_INNER_TR: 194,
+FOREST_OUTER_L: 217,  FOREST_CENTER: 218,  FOREST_OUTER_R: 219,
+FOREST_INNER_BL: 223, FOREST_INNER_BR: 224,
+FOREST_OUTER_BL: 244, FOREST_OUTER_B: 245, FOREST_OUTER_BR: 246,
+
+// Forest canopy — trees type 2 / pine (Wang color 12 on air/5)
+FOREST2_OUTER_TL: 202, FOREST2_OUTER_T: 203, FOREST2_OUTER_TR: 204,
+FOREST2_INNER_TL: 205, FOREST2_INNER_TR: 206,
+FOREST2_OUTER_L: 226,  FOREST2_CENTER: 227,  FOREST2_OUTER_R: 228,
+FOREST2_INNER_BL: 232, FOREST2_INNER_BR: 233,
+FOREST2_OUTER_BL: 253, FOREST2_OUTER_B: 254, FOREST2_OUTER_BR: 255,
+
+// Dirt terrain patches (Wang color 2 on grass/1)
+DIRT_OUTER_TL: 11,  DIRT_OUTER_T: 12,  DIRT_OUTER_TR: 13,
+DIRT_INNER_TL: 14,  DIRT_INNER_TR: 15,
+DIRT_OUTER_L: 38,   DIRT_FULL: 39,     DIRT_OUTER_R: 40,
+DIRT_INNER_BL: 41,  DIRT_INNER_BR: 42,
+DIRT_OUTER_BL: 65,  DIRT_OUTER_B: 66,  DIRT_OUTER_BR: 67,
+```
+
+- [ ] **Step 6: Run the updated generator and verify output**
+
+Run: `npx tsx scripts/generate-settlement-map.ts`
+Expected: Map generates without errors. Output should report 100×100 tiles and 40+ objects.
+
+- [ ] **Step 7: Visual verification**
+
+Run: `npm run dev` → Navigate to settlement.
+Verify:
+- [ ] Grass has coherent biome zones (not random noise)
+- [ ] River has smooth bank transitions (no harsh blue rectangles)
+- [ ] Dense forest clusters ring the town with proper canopy edge tiles
+- [ ] Mix of deciduous and pine forest areas
+- [ ] Town center is clear of forest (center penalty works)
+
+---
+
+### Task 14: Organic Path Network & Dirt Patches
+
+**Files:**
+- Modify: `scripts/generate-settlement-map.ts`
+
+**Overview:** Replace the rigid cross-road with organic, curving dirt paths that connect to buildings. Add dirt terrain patches around building clusters.
+
+- [ ] **Step 1: Write path routing function**
+
+Replace the straight-line path code (section 3) with a Bresenham-based path drawer that adds gentle curves via waypoints:
+
+```typescript
+// ── 3. ORGANIC PATH NETWORK ──────────────────────────────────────
+
+// Bresenham line with path-width support
+function drawPath(x0: number, y0: number, x1: number, y1: number, width: number = 2): void {
+  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+  let cx = x0, cy = y0;
+
+  while (true) {
+    // Paint path tiles in a square of given width
+    for (let wy = -Math.floor(width / 2); wy < Math.ceil(width / 2); wy++) {
+      for (let wx = -Math.floor(width / 2); wx < Math.ceil(width / 2); wx++) {
+        setTile(paths, cx + wx, cy + wy, PW.DIRT_PATH_CROSS);
+        // Clear forest from path
+        if (isForest[idx(cx + wx, cy + wy)]) {
+          isForest[idx(cx + wx, cy + wy)] = false;
+        }
+        // Clear collision from path
+        setTile(collisions, cx + wx, cy + wy, 0);
+      }
+    }
+
+    if (cx === x1 && cy === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; cx += sx; }
+    if (e2 < dx) { err += dx; cy += sy; }
+  }
+}
+
+// Main roads (connect map edges through town center)
+// N-S main road with gentle curve
+drawPath(49, 8, 47, 30, 2);
+drawPath(47, 30, 49, 50, 2);
+drawPath(49, 50, 51, 70, 2);
+drawPath(51, 70, 49, 92, 2);
+
+// E-W main road with curve
+drawPath(12, 49, 30, 47, 2);
+drawPath(30, 47, 50, 49, 2);
+drawPath(50, 49, 70, 51, 2);
+drawPath(70, 51, 88, 49, 2);
+
+// Side paths to building clusters (1-tile width)
+// Connect each building district to the nearest main road
+drawPath(44, 38, 47, 40, 1);  // Residential N to main road
+drawPath(58, 48, 55, 49, 1);  // Workshops to E-W road
+drawPath(38, 48, 40, 49, 1);  // Resource store to E-W road
+drawPath(44, 55, 47, 53, 1);  // Residential S to main road
+drawPath(56, 46, 55, 49, 1);  // Chapel to road
+drawPath(43, 46, 45, 49, 1);  // Tavern to road
+```
+
+- [ ] **Step 2: Add dirt terrain patches around buildings**
+
+After buildings are placed, paint dirt ground tiles around each building cluster to create worn/trampled ground:
+
+```typescript
+// ── Dirt patches around buildings ────────────────────────────────
+// For each building, paint a dirt patch on the ground layer within radius 2
+for (const bld of buildingPlacements) {
+  const radius = 2;
+  for (let dy = -radius; dy <= radius; dy++) {
+    for (let dx = -radius; dx <= radius; dx++) {
+      const bx = bld.x + dx;
+      const by = bld.y + dy;
+      if (bx < 0 || bx >= MAP_W || by < 0 || by >= MAP_H) continue;
+      if (isWater[idx(bx, by)]) continue;
+      // Use full dirt for center, transitions at edge
+      if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) {
+        setTile(ground, bx, by, PW.DIRT_FULL);
+      } else {
+        // Edge tiles — simplified (full dirt is acceptable for MVP)
+        setTile(ground, bx, by, PW.DIRT_FULL);
+      }
+    }
+  }
+}
+```
+
+- [ ] **Step 3: Run generator and verify**
+
+Run: `npx tsx scripts/generate-settlement-map.ts`
+Expected: Paths now curve organically and connect to buildings. Dirt patches visible around building clusters.
+
+---
+
+### Task 15: Decorative Object Scattering & Building Density
+
+**Files:**
+- Modify: `scripts/generate-settlement-map.ts`
+
+**Overview:** Add decorative objects (rocks, wheat fields, flowers) and increase building count to match inspiration density.
+
+- [ ] **Step 1: Add more buildings for density**
+
+Expand `buildingPlacements` array to include 15-20 additional buildings:
+
+```typescript
+// Add to buildingPlacements array:
+
+// Second residential cluster (NE quadrant)
+{ name: "House 11", type: "building", x: 58, y: 38, spriteKey: "bld-houses", frame: 0 },
+{ name: "House 12", type: "building", x: 60, y: 38, spriteKey: "bld-houses", frame: 2 },
+{ name: "House 13", type: "building", x: 62, y: 38, spriteKey: "bld-houses", frame: 4 },
+{ name: "Hut 3", type: "building", x: 58, y: 36, spriteKey: "bld-huts", frame: 2 },
+
+// Docks near river
+{ name: "Dock 1", type: "building", x: 22, y: 30, spriteKey: "bld-docks", frame: 0 },
+{ name: "Dock 2", type: "building", x: 24, y: 30, spriteKey: "bld-docks", frame: 1 },
+
+// Southern market extension
+{ name: "Market Stall 4", type: "building", x: 44, y: 52, spriteKey: "bld-market", frame: 3 },
+{ name: "Market Stall 5", type: "building", x: 46, y: 52, spriteKey: "bld-market", frame: 4 },
+
+// Additional workshops
+{ name: "Workshop 3", type: "building", x: 60, y: 50, spriteKey: "bld-workshops", frame: 2 },
+{ name: "Workshop 4", type: "building", x: 62, y: 50, spriteKey: "bld-workshops", frame: 3 },
+
+// Farm buildings (west)
+{ name: "Farm House", type: "building", x: 35, y: 50, spriteKey: "bld-houses", frame: 3 },
+{ name: "Farm Hut 1", type: "building", x: 33, y: 50, spriteKey: "bld-huts", frame: 3 },
+{ name: "Farm Hut 2", type: "building", x: 33, y: 52, spriteKey: "bld-huts", frame: 4 },
+
+// Tower/defense
+{ name: "Tower 2", type: "building", x: 40, y: 35, spriteKey: "bld-tower", frame: 1 },
+{ name: "Tower 3", type: "building", x: 62, y: 55, spriteKey: "bld-tower", frame: 2 },
+
+// Additional wells and signs
+{ name: "Well 2", type: "building", x: 55, y: 50, spriteKey: "misc-well", frame: 1 },
+{ name: "Quest Board", type: "building", x: 47, y: 44, spriteKey: "misc-quest-board", frame: 0 },
+{ name: "Signpost E", type: "building", x: 65, y: 49, spriteKey: "misc-signs", frame: 2 },
+{ name: "Signpost W", type: "building", x: 35, y: 49, spriteKey: "misc-signs", frame: 3 },
+```
+
+- [ ] **Step 2: Add decorative object scattering**
+
+After building placement, add scattered decorative objects using noise:
+
+```typescript
+// ── DECORATIONS — Rocks, wheat, chests, tombstones ───────────────
+
+// Wheat fields near farms (west of town)
+for (let y = 54; y < 62; y++) {
+  for (let x = 30; x < 40; x++) {
+    if (rand() < 0.4 && !isWater[idx(x, y)] && paths[idx(x, y)] === 0) {
+      addObject(`Wheat ${x}-${y}`, "decoration", x, y, {
+        spriteKey: "nat-wheatfield",
+        frame: Math.floor(rand() * 4),
+      });
+    }
+  }
+}
+
+// Scattered rocks in wilderness
+for (let y = 0; y < MAP_H; y++) {
+  for (let x = 0; x < MAP_W; x++) {
+    const distFromCenter = Math.sqrt((x - 50) ** 2 + (y - 50) ** 2);
+    if (distFromCenter > 30 && rand() < 0.008 && !isWater[idx(x, y)] && !isForest[idx(x, y)]) {
+      addObject(`Rock ${x}-${y}`, "decoration", x, y, {
+        spriteKey: "nat-rocks",
+        frame: Math.floor(rand() * 12),
+      });
+    }
+  }
+}
+
+// Tombstones near chapel
+for (let y = 44; y < 48; y++) {
+  for (let x = 57; x < 61; x++) {
+    if (rand() < 0.3) {
+      addObject(`Tombstone ${x}-${y}`, "decoration", x, y, {
+        spriteKey: "misc-tombstones",
+        frame: Math.floor(rand() * 8),
+      });
+    }
+  }
+}
+
+// Chests near keep/barracks
+addObject("Chest 1", "decoration", 50, 43, { spriteKey: "misc-chests", frame: 0 });
+addObject("Chest 2", "decoration", 59, 53, { spriteKey: "misc-chests", frame: 1 });
+```
+
+- [ ] **Step 3: Ensure BuildingManager handles "decoration" type objects**
+
+In `src/engine/settlement/buildingManager.ts`, update the type filter to also include "decoration" objects. These render identically to buildings (sprite + optional collision) but don't need collision for most decorations:
+
+```typescript
+// In BuildingManager constructor, change:
+if (obj.type !== "building" || !obj.x || !obj.y) continue;
+// To:
+if ((obj.type !== "building" && obj.type !== "decoration") || !obj.x || !obj.y) continue;
+```
+
+Note: Decorations should NOT have collision bodies by default. Add a check:
+```typescript
+// Only add collision for buildings, not decorations
+if (obj.type === "building") {
+  scene.physics.add.existing(sprite, true);
+  this.collisionGroup.add(sprite);
+}
+```
+
+- [ ] **Step 4: Run generator, verify decorations render**
+
+Run: `npx tsx scripts/generate-settlement-map.ts && npm run dev`
+Verify:
+- [ ] Wheat fields visible west of town
+- [ ] Scattered rocks in wilderness areas
+- [ ] Tombstones near chapel
+- [ ] Chests near keep/barracks
+- [ ] Decorations don't block player movement
+
+---
+
+### Task 13-15 Execution Order
+
+| Order | Task | Depends On |
+|-------|------|-----------|
+| 13 | Terrain Biomes & Forest Canopy | Tasks 1-6 complete |
+| 14 | Organic Paths & Dirt Patches | Task 13 (needs isForest, isWater grids) |
+| 15 | Decorations & Building Density | Task 14 (paths clear forest) |
+
+**These tasks must be executed sequentially** — each builds on the data structures (isWater, isForest) created by the previous one.
+
+### Visual Acceptance Criteria
+
+After Tasks 13-15, the settlement should match these qualities from the inspiration map:
+
+- [ ] **Dense forests** — thick canopy clusters with proper Wang edge transitions, not individual tree tiles
+- [ ] **Two forest types** — deciduous (green) and pine (brown/autumn) in different regions
+- [ ] **Smooth river** — sinusoidal with bank transitions, not harsh rectangles
+- [ ] **Coherent terrain** — grass zones cluster naturally, not per-tile noise
+- [ ] **Organic paths** — curved roads connecting buildings, not straight grid lines
+- [ ] **Dirt patches** — worn ground around buildings
+- [ ] **40+ buildings** — tightly clustered town center, not sparse grid
+- [ ] **Decorations everywhere** — rocks, wheat, tombstones, chests scattered throughout
+- [ ] **Clear town center** — forest stays outside the settlement core

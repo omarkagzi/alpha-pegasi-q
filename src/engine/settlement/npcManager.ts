@@ -38,7 +38,7 @@ export class NpcManager {
     this.scene = scene;
 
     for (const obj of npcObjects) {
-      if (obj.type !== "npc" || !obj.x || !obj.y) continue;
+      if (obj.type !== "agent" || !obj.x || !obj.y) continue;
 
       const props = this.getProperties(obj);
       const npcData: NpcData = {
