@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pack-assets": "tsx scripts/pack-minyworld-assets.ts",
+    "generate-map": "tsx scripts/generate-settlement-map.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.4",
