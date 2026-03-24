@@ -45,7 +45,7 @@ export class NpcManager {
         name: obj.name,
         agentId: props.agentId || `agent-${obj.name.toLowerCase()}`,
         agentName: props.agentName || obj.name,
-        sprite: props.sprite || "npc-assistant",
+        sprite: props.sprite || "chr-arthax",
         x: obj.x,
         y: obj.y,
       };
@@ -97,13 +97,20 @@ export class NpcManager {
       this
     );
 
-    // Idle animation: toggle between frames 0 and 1 every 800ms
+    // Idle animation: cycle through first row of frames every 400ms.
+    // Column count varies per champion (5 or 6), so we detect it from
+    // the spritesheet's total frame count and known row count.
+    const totalFrames = sprite.texture.frameTotal - 1; // Phaser adds a __BASE frame
+    // Champions are either 5×8, 6×8, 5×12, or 6×9 — first row = cols frames
+    // Heuristic: cols = totalFrames <= 40 ? 5 : 6 (or read from manifest)
+    const cols = (totalFrames % 6 === 0 && totalFrames > 40) ? 6 : 5;
+    let idleFrame = 0;
     const idleTimer = this.scene.time.addEvent({
-      delay: 800,
+      delay: 400,
       loop: true,
       callback: () => {
-        const currentFrame = sprite.frame.name;
-        sprite.setFrame(currentFrame === "0" ? 1 : 0);
+        idleFrame = (idleFrame + 1) % cols;
+        sprite.setFrame(idleFrame);
       },
     });
 
