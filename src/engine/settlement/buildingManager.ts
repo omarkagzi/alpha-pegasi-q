@@ -3,7 +3,7 @@ import Phaser from "phaser";
 interface BuildingInstance {
   name: string;
   sprite: Phaser.GameObjects.Sprite;
-  body: Phaser.Physics.Arcade.StaticBody;
+  body?: Phaser.Physics.Arcade.StaticBody;
 }
 
 /**
@@ -21,7 +21,8 @@ export class BuildingManager {
     this.collisionGroup = scene.physics.add.staticGroup();
 
     for (const obj of buildingObjects) {
-      if (obj.type !== "building" || !obj.x || !obj.y) continue;
+      const validTypes = ["building", "decoration", "wall"];
+      if (!validTypes.includes(obj.type!) || !obj.x || !obj.y) continue;
 
       const props = this.getProperties(obj);
       const spriteKey = props.spriteKey;
@@ -40,14 +41,18 @@ export class BuildingManager {
       );
       sprite.setDepth(5);
 
-      // Add static physics body for collision
-      scene.physics.add.existing(sprite, true);
-      this.collisionGroup.add(sprite);
+      // Add static physics body for collision (buildings and walls only, not decorations)
+      if (obj.type !== "decoration") {
+        scene.physics.add.existing(sprite, true);
+        this.collisionGroup.add(sprite);
+      }
 
       this.buildings.push({
         name: obj.name,
         sprite,
-        body: sprite.body as Phaser.Physics.Arcade.StaticBody,
+        body: obj.type !== "decoration"
+          ? (sprite.body as Phaser.Physics.Arcade.StaticBody)
+          : undefined,
       });
     }
   }

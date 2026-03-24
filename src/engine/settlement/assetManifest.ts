@@ -7,16 +7,16 @@
  * ALL other files import from here. No magic strings for asset keys.
  */
 
-// ── Terrain Tileset (Puny World) ──────────────────────────────────
+// ── Terrain Tileset (MinyWorld Ground) ────────────────────────────
 export const TERRAIN = {
-  key: "punyworld-overworld",
-  path: "/sprites/tiles/punyworld-overworld-tileset.png",
+  key: "minyworld-ground",
+  path: "/sprites/tiles/minyworld-ground.png",
   tileWidth: 16,
   tileHeight: 16,
-  columns: 27,
-  tileCount: 1755,
-  imageWidth: 432,
-  imageHeight: 1040,
+  columns: 2,
+  tileCount: 2,
+  imageWidth: 32,
+  imageHeight: 16,
 } as const;
 
 // ── Building Spritesheets (MinyWorld) ─────────────────────────────
@@ -30,6 +30,7 @@ export const BUILDINGS = {
   workshops:  { key: "bld-workshops",  path: "/sprites/buildings/workshops.png",  fw: 16, fh: 16, cols: 3, rows: 3 },
   keep:       { key: "bld-keep",       path: "/sprites/buildings/keep.png",       fw: 16, fh: 16, cols: 6, rows: 4 },
   tower:      { key: "bld-tower",      path: "/sprites/buildings/tower.png",      fw: 16, fh: 16, cols: 3, rows: 6 },
+  tower2:     { key: "bld-tower2",    path: "/sprites/buildings/tower2.png",    fw: 16, fh: 16, cols: 3, rows: 6 },
   barracks:   { key: "bld-barracks",   path: "/sprites/buildings/barracks.png",   fw: 16, fh: 16, cols: 4, rows: 5 },
   chapels:    { key: "bld-chapels",    path: "/sprites/buildings/chapels.png",    fw: 16, fh: 16, cols: 3, rows: 2 },
   resources:  { key: "bld-resources",  path: "/sprites/buildings/resources.png",  fw: 16, fh: 16, cols: 3, rows: 5 },

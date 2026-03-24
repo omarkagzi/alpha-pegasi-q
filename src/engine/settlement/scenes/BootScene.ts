@@ -20,7 +20,7 @@ export class BootScene extends Phaser.Scene {
       this.loadFailed = true;
     });
 
-    // Terrain tileset (Puny World)
+    // Terrain tileset (MinyWorld Ground)
     this.load.image(TERRAIN.key, TERRAIN.path);
 
     // All MinyWorld spritesheets (buildings, nature, misc, characters, animals)

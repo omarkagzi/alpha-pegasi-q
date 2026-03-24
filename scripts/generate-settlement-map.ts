@@ -1,9 +1,9 @@
 // scripts/generate-settlement-map.ts
 /**
- * Arboria Settlement Map Generator — MinyWorld + Puny World Edition
+ * Arboria Settlement Map Generator — MinyWorld Edition
  *
  * Generates a 100×100 Tiled-compatible JSON map.
- * - Terrain layers use Puny World tileset GIDs (1,755 tiles, 27 columns)
+ * - Ground layer uses MinyWorld ground tileset (2 tiles: grass=1, road=2)
  * - Buildings/objects/NPCs are in the "interactions" object layer
  *
  * Run: npx tsx scripts/generate-settlement-map.ts
@@ -11,82 +11,11 @@
 import * as fs from "fs";
 import * as path from "path";
 
-// ── Puny World Terrain GIDs ───────────────────────────────────────
-// tileset: 27 columns, 65 rows. GID = tileIndex + 1 (Tiled firstgid=1).
-// Row = Math.floor(tileIndex / 27), Col = tileIndex % 27.
-// These are the KEY terrain GIDs verified from the .tsx Wang tile definitions.
-
-const PW = {
-  // Grass variants — verified against .tsx wangset (all wangid 0,1,0,1,0,1,0,1)
-  GRASS_1: 1,    // tileId 0 — plain grass
-  GRASS_2: 2,    // tileId 1 — grass variant 2
-  GRASS_3: 3,    // tileId 2 — grass variant 3
-  GRASS_4: 29,   // tileId 28 — grass variant 4
-  GRASS_5: 30,   // tileId 29 — grass variant 5
-  GRASS_6: 56,   // tileId 55 — grass variant 6
-  GRASS_7: 57,   // tileId 56 — grass variant 7
-  GRASS_8: 58,   // tileId 57 — grass variant 8
-
-  // Dirt path tiles (Wang edge pathways — wangset "pathways", wangcolor 1)
-  // These GIDs are from the .tsx wangtile definitions for "dirt-paths"
-  DIRT_PATH_S:     4,   // tileId 3  — south end (wangid 0,0,0,0,1,0,0,0)
-  DIRT_PATH_SW:    5,   // tileId 4  — SW corner (wangid 0,0,1,0,1,0,0,0)
-  DIRT_PATH_CROSS: 6,   // tileId 5  — crossroads (wangid 0,0,1,0,1,0,1,0)
-  DIRT_PATH_SE:    7,   // tileId 6  — SE corner (wangid 0,0,0,0,1,0,1,0)
-  DIRT_PATH_W:     31,  // tileId 30 — W side (wangid 1,0,0,0,1,0,0,0)
-  DIRT_PATH_FULL:  32,  // tileId 31 — full intersection (wangid 1,0,1,0,1,0,0,0)
-  DIRT_PATH_NS:    33,  // tileId 32 — NS straight (wangid 1,0,1,0,1,0,1,0)
-  DIRT_PATH_E:     34,  // tileId 33 — E side (wangid 1,0,0,0,1,0,1,0)
-  DIRT_PATH_N:     58,  // tileId 57 — north end (wangid 1,0,0,0,0,0,0,0)
-  DIRT_PATH_NW:    59,  // tileId 58 — NW corner (wangid 1,0,1,0,0,0,0,0)
-  DIRT_PATH_X:     60,  // tileId 59 — X intersection (wangid 1,0,1,0,0,0,1,0)
-  DIRT_PATH_NE:    61,  // tileId 60 — NE corner (wangid 1,0,0,0,0,0,1,0)
-  DIRT_HORIZ:      86,  // tileId 85 — horizontal segment (wangid 0,0,1,0,0,0,0,0)
-  DIRT_DIAG:       87,  // tileId 86 — diagonal (wangid 0,0,1,0,0,0,1,0)
-  DIRT_VERT:       88,  // tileId 87 — vertical segment (wangid 0,0,0,0,0,0,1,0)
-  DIRT_END:        89,  // tileId 88 — end cap
-
-  // River/Water tiles (Wang terrain type 7 = river)
-  // Water edges defined by Wang tile mappings in .tsx
-  WATER_TL: 279, // River corner top-left area
-  WATER_T:  280, // River edge top
-  WATER_TR: 281, // River corner top-right
-  WATER_L:  306, // River edge left
-  WATER_C:  307, // River center (full water)
-  WATER_R:  308, // River edge right
-  WATER_BL: 333, // River corner bottom-left
-  WATER_B:  334, // River edge bottom
-  WATER_BR: 335, // River corner bottom-right
-
-  // Forest canopy tiles (Wang color 6 on air/5 base — for paths overlay layer)
-  // These are the CORRECT tree tiles. GIDs 120-124 were cliff-transparent (color 11), NOT trees.
-  FOREST_CENTER:   218,  // tileId 217 — full forest canopy (all corners = forest)
-  FOREST_OUTER_TL: 190,  // tileId 189 — forest starts at BR corner
-  FOREST_OUTER_T:  191,  // tileId 190 — forest below, air above
-  FOREST_OUTER_TR: 192,  // tileId 191 — forest starts at BL corner
-  FOREST_OUTER_L:  217,  // tileId 216 — forest right, air left
-  FOREST_OUTER_R:  219,  // tileId 218 — forest left, air right
-  FOREST_OUTER_BL: 244,  // tileId 243 — forest above-right only
-  FOREST_OUTER_B:  245,  // tileId 244 — forest above, air below
-  FOREST_OUTER_BR: 246,  // tileId 245 — forest above-left only
-
-  // Cliff terrain (Wang terrain type 4 = cliff)
-  CLIFF_TL: 147,
-  CLIFF_T:  148,
-  CLIFF_TR: 149,
-  CLIFF_L:  175,
-  CLIFF_C:  176,
-  CLIFF_R:  151,
-  CLIFF_BL: 203,
-  CLIFF_B:  204,
-  CLIFF_BR: 205,
-
-  // Sand terrain (Wang terrain type 3)
-  SAND: 310,  // Full sand tile
-
-  // Animated water (uses animation frames defined in .tsx)
-  WATER_ANIM_1: 271, // tileId 270 — animated water frame 1
-  WATER_ANIM_2: 272, // tileId 271 — animated water frame 1
+// ── MinyWorld Ground GIDs ─────────────────────────────────────────
+// Tileset: 2 columns, 1 row. GID = tileIndex + 1 (Tiled firstgid=1).
+const MW = {
+  GRASS: 1,  // Tile 0 — muted yellow-green grass
+  ROAD:  2,  // Tile 1 — tan/beige road
 } as const;
 
 const MAP_W = 100;
@@ -94,10 +23,9 @@ const MAP_H = 100;
 const TILE_SIZE = 16;
 
 // ── Layer Data ────────────────────────────────────────────────────
-const ground: number[] = new Array(MAP_W * MAP_H).fill(PW.GRASS_1);
-const paths: number[] = new Array(MAP_W * MAP_H).fill(0);
+const ground: number[] = new Array(MAP_W * MAP_H).fill(MW.GRASS);
 const collisions: number[] = new Array(MAP_W * MAP_H).fill(0);
-const COLLISION = PW.GRASS_1; // Any valid GID; layer is invisible
+const COLLISION = MW.GRASS; // Any valid GID; layer is invisible
 
 // Object layer accumulator
 interface MapObject {
@@ -159,57 +87,23 @@ function addObject(
   objects.push(obj);
 }
 
-// ── 1. GROUND LAYER — Varied grass ───────────────────────────────
-const grassTiles = [PW.GRASS_1, PW.GRASS_2, PW.GRASS_3, PW.GRASS_4, PW.GRASS_5, PW.GRASS_6, PW.GRASS_7, PW.GRASS_8];
-for (let y = 0; y < MAP_H; y++) {
-  for (let x = 0; x < MAP_W; x++) {
-    ground[idx(x, y)] = grassTiles[Math.floor(rand() * grassTiles.length)];
-  }
-}
+// ── 1. GROUND LAYER — Single grass tile ──────────────────────────
+// Ground is already filled with MW.GRASS. No variation needed.
 
-// ── 2. RIVER — Diagonal from NW to SE ────────────────────────────
-// A river running from top-left area toward bottom-right, with proper edge tiles
-// (Simplified: 3-tile-wide water channel with edge tiles)
-for (let i = 0; i < 80; i++) {
-  const rx = Math.floor(10 + i * 0.8 + Math.sin(i * 0.15) * 4);
-  const ry = Math.floor(5 + i * 1.1);
-  if (ry >= MAP_H - 5) break;
-  for (let w = -1; w <= 1; w++) {
-    setTile(ground, rx + w, ry, PW.WATER_C);
-    setTile(collisions, rx + w, ry, COLLISION);
-  }
-}
-
-// ── 3. DIRT PATH NETWORK ─────────────────────────────────────────
-// Main N-S road through town center (col 48-51, full height)
+// ── 2. ROAD NETWORK — Using MW.ROAD on ground layer ─────────────
+// Main N-S road through town center (col 49-50, full height)
 for (let y = 10; y < 90; y++) {
-  setTile(paths, 49, y, PW.DIRT_VERT);
-  setTile(paths, 50, y, PW.DIRT_VERT);
+  setTile(ground, 49, y, MW.ROAD);
+  setTile(ground, 50, y, MW.ROAD);
 }
 
-// E-W road through town center (row 48-51)
+// E-W road through town center (row 49-50)
 for (let x = 15; x < 85; x++) {
-  setTile(paths, x, 49, PW.DIRT_HORIZ);
-  setTile(paths, x, 50, PW.DIRT_HORIZ);
+  setTile(ground, x, 49, MW.ROAD);
+  setTile(ground, x, 50, MW.ROAD);
 }
 
-// Intersection
-setTile(paths, 49, 49, PW.DIRT_PATH_CROSS);
-setTile(paths, 50, 49, PW.DIRT_PATH_CROSS);
-setTile(paths, 49, 50, PW.DIRT_PATH_CROSS);
-setTile(paths, 50, 50, PW.DIRT_PATH_CROSS);
-
-// ── 4. TREE BORDER — Ring of forest around map edges ─────────────
-// Use forest canopy center tile for dense areas; edges get proper Wang tiles later (Chunk 5)
-for (let y = 0; y < MAP_H; y++) {
-  for (let x = 0; x < MAP_W; x++) {
-    const distFromEdge = Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y);
-    if (distFromEdge < 6 && rand() < 0.6 - distFromEdge * 0.08) {
-      setTile(paths, x, y, PW.FOREST_CENTER);
-      setTile(collisions, x, y, COLLISION);
-    }
-  }
-}
+// ── 3. (Trees/forest will be sprite objects in Chunk 2) ──────────
 
 // ── 5. BUILDINGS — Placed as objects, not tile GIDs ──────────────
 
@@ -319,14 +213,14 @@ const tiledMap = {
   tilesets: [
     {
       firstgid: 1,
-      name: "punyworld-overworld",
+      name: "minyworld-ground",
       tilewidth: TILE_SIZE,
       tileheight: TILE_SIZE,
-      tilecount: 1755,
-      columns: 27,
-      image: "../../sprites/tiles/punyworld-overworld-tileset.png",
-      imagewidth: 432,
-      imageheight: 1040,
+      tilecount: 2,
+      columns: 2,
+      image: "../../sprites/tiles/minyworld-ground.png",
+      imagewidth: 32,
+      imageheight: 16,
       spacing: 0,
       margin: 0,
     },
@@ -346,18 +240,6 @@ const tiledMap = {
     },
     {
       id: 2,
-      name: "paths",
-      type: "tilelayer",
-      width: MAP_W,
-      height: MAP_H,
-      data: paths,
-      opacity: 1,
-      visible: true,
-      x: 0,
-      y: 0,
-    },
-    {
-      id: 3,
       name: "collisions",
       type: "tilelayer",
       width: MAP_W,
@@ -369,7 +251,7 @@ const tiledMap = {
       y: 0,
     },
     {
-      id: 4,
+      id: 3,
       name: "interactions",
       type: "objectgroup",
       objects,

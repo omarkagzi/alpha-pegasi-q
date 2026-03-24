@@ -35,7 +35,7 @@ export class SettlementScene extends Phaser.Scene {
     // 1. Load tilemap
     const map = this.make.tilemap({ key: TILEMAP.key });
 
-    // 2. Add Puny World tileset
+    // 2. Add MinyWorld ground tileset
     const tileset = map.addTilesetImage(TERRAIN.key, TERRAIN.key);
 
     if (!tileset) {
@@ -51,12 +51,9 @@ export class SettlementScene extends Phaser.Scene {
       return;
     }
 
-    // 3. Create terrain layers
+    // 3. Create terrain layer
     const groundLayer = map.createLayer("ground", tileset);
-    const pathsLayer = map.createLayer("paths", tileset);
-
     groundLayer?.setDepth(0);
-    pathsLayer?.setDepth(1);
 
     // 4. Collision layer (invisible)
     const collisionLayer = map.createLayer("collisions", tileset);
@@ -79,8 +76,9 @@ export class SettlementScene extends Phaser.Scene {
     }
 
     // 6. Create buildings from object layer
+    const renderableTypes = ["building", "decoration", "wall"];
     const buildingObjects = objectLayer
-      ? objectLayer.objects.filter((o) => o.type === "building")
+      ? objectLayer.objects.filter((o) => renderableTypes.includes(o.type!))
       : [];
     this.buildingManager = new BuildingManager(this, buildingObjects);
 
@@ -119,7 +117,7 @@ export class SettlementScene extends Phaser.Scene {
     weatherEngine.start();
 
     // Track layers for dynamic season tint updates
-    this.tintedLayers = [groundLayer, pathsLayer].filter(
+    this.tintedLayers = [groundLayer].filter(
       (l): l is Phaser.Tilemaps.TilemapLayer => l !== null
     );
 
