@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { CHARACTERS } from "./assetManifest";
 
 const SPEED = 80;
 
@@ -23,7 +24,7 @@ export class PlayerController {
     this.scene = scene;
 
     // Create player sprite with physics
-    this.sprite = scene.physics.add.sprite(spawnX, spawnY, "player", 0);
+    this.sprite = scene.physics.add.sprite(spawnX, spawnY, CHARACTERS.player.key, 0);
     this.sprite.setSize(12, 12); // Slightly smaller hitbox than 16x16 for smoother movement
     this.sprite.setOffset(2, 4);
     this.sprite.setDepth(10);
@@ -37,8 +38,8 @@ export class PlayerController {
       D: scene.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
     };
 
-    // Create walk animations (4 directions, 4 frames each)
-    // Spritesheet layout: row 0 = down, row 1 = left, row 2 = right, row 3 = up
+    // Create walk animations (MinyWorld Farmer: 5 cols × 12 rows)
+    // Row layout: rows 0-2 = down, rows 3-5 = left, rows 6-8 = right, rows 9-11 = up
     this.createAnimations(scene);
 
     // Camera follow with deadzone
@@ -47,20 +48,21 @@ export class PlayerController {
   }
 
   private createAnimations(scene: Phaser.Scene): void {
-    const directions: Array<{ key: string; row: number }> = [
-      { key: "walk-down", row: 0 },
-      { key: "walk-left", row: 1 },
-      { key: "walk-right", row: 2 },
-      { key: "walk-up", row: 3 },
+    const cols = CHARACTERS.player.cols; // 5
+    const directions: Array<{ key: string; startRow: number }> = [
+      { key: "walk-down", startRow: 0 },
+      { key: "walk-left", startRow: 3 },
+      { key: "walk-right", startRow: 6 },
+      { key: "walk-up", startRow: 9 },
     ];
 
     for (const dir of directions) {
       if (!scene.anims.exists(dir.key)) {
         scene.anims.create({
           key: dir.key,
-          frames: scene.anims.generateFrameNumbers("player", {
-            start: dir.row * 4,
-            end: dir.row * 4 + 3,
+          frames: scene.anims.generateFrameNumbers(CHARACTERS.player.key, {
+            start: dir.startRow * cols,
+            end: dir.startRow * cols + cols - 1,
           }),
           frameRate: 8,
           repeat: -1,
@@ -110,11 +112,12 @@ export class PlayerController {
     } else {
       // Idle: stop animation, show first frame of current direction
       this.sprite.anims.stop();
+      const cols = CHARACTERS.player.cols;
       const idleFrames: Record<string, number> = {
         down: 0,
-        left: 4,
-        right: 8,
-        up: 12,
+        left: 3 * cols,
+        right: 6 * cols,
+        up: 9 * cols,
       };
       this.sprite.setFrame(idleFrames[this.facing]);
     }
