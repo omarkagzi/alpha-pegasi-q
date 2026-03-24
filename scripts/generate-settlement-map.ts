@@ -58,12 +58,17 @@ const PW = {
   WATER_B:  334, // River edge bottom
   WATER_BR: 335, // River corner bottom-right
 
-  // Tree tiles (as terrain decoration — from Puny World)
-  TREE_1: 120,   // Tree type 1
-  TREE_2: 121,   // Tree type 2
-  TREE_3: 122,   // Tree type 3
-  TREE_4: 123,   // Tree type 4
-  TREE_5: 124,   // Tree type 5
+  // Forest canopy tiles (Wang color 6 on air/5 base — for paths overlay layer)
+  // These are the CORRECT tree tiles. GIDs 120-124 were cliff-transparent (color 11), NOT trees.
+  FOREST_CENTER:   218,  // tileId 217 — full forest canopy (all corners = forest)
+  FOREST_OUTER_TL: 190,  // tileId 189 — forest starts at BR corner
+  FOREST_OUTER_T:  191,  // tileId 190 — forest below, air above
+  FOREST_OUTER_TR: 192,  // tileId 191 — forest starts at BL corner
+  FOREST_OUTER_L:  217,  // tileId 216 — forest right, air left
+  FOREST_OUTER_R:  219,  // tileId 218 — forest left, air right
+  FOREST_OUTER_BL: 244,  // tileId 243 — forest above-right only
+  FOREST_OUTER_B:  245,  // tileId 244 — forest above, air below
+  FOREST_OUTER_BR: 246,  // tileId 245 — forest above-left only
 
   // Cliff terrain (Wang terrain type 4 = cliff)
   CLIFF_TL: 147,
@@ -195,12 +200,12 @@ setTile(paths, 49, 50, PW.DIRT_PATH_CROSS);
 setTile(paths, 50, 50, PW.DIRT_PATH_CROSS);
 
 // ── 4. TREE BORDER — Ring of forest around map edges ─────────────
-const treeTiles = [PW.TREE_1, PW.TREE_2, PW.TREE_3, PW.TREE_4, PW.TREE_5];
+// Use forest canopy center tile for dense areas; edges get proper Wang tiles later (Chunk 5)
 for (let y = 0; y < MAP_H; y++) {
   for (let x = 0; x < MAP_W; x++) {
     const distFromEdge = Math.min(x, y, MAP_W - 1 - x, MAP_H - 1 - y);
     if (distFromEdge < 6 && rand() < 0.6 - distFromEdge * 0.08) {
-      setTile(paths, x, y, treeTiles[Math.floor(rand() * treeTiles.length)]);
+      setTile(paths, x, y, PW.FOREST_CENTER);
       setTile(collisions, x, y, COLLISION);
     }
   }
