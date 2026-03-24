@@ -1,3 +1,5 @@
+> **⚠️ SUPERSEDED** — This plan has been replaced by [2026-03-23 MinyWorld + Puny World Asset Migration](./2026-03-23-minyworld-punyworld-asset-migration.md). The Kenney Tiny Town approach was abandoned due to multi-tile assembly complexity. MinyWorld single-tile buildings + Puny World terrain provide a better path.
+
 # Phase 2.5 — Arboria Visual Reimagining Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
