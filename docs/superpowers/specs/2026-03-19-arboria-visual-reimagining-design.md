@@ -61,61 +61,34 @@ Replace all visual assets with the Kenney pixel art packs. Redesign the map from
 
 ## 2. Asset Inventory
 
-### 2.1 Kenney Tiny Town
+### Terrain: Puny World Overworld Tileset
+- **Source:** `Design Assets/Puny World Assets/punyworld-overworld-tileset.png`
+- **Dimensions:** 432×1040px (27 columns × 65 rows = 1,755 tiles at 16×16)
+- **Features:** Wang auto-tiling for grass/dirt/sand/cliff/water transitions, animated water tiles, 3 pathway types (dirt, sand, water), 12 terrain blending types
+- **License:** CC0
 
-| Category | Count | Details |
-|----------|-------|---------|
-| **Terrain** | ~12 tiles | Grass (3 variants), dirt path, stone road, water, sand, flowers, cliff edges |
-| **Buildings** | ~18 tiles | Small house (red/blue/gray roof), large house (red/blue/gray), castle gate, castle towers, castle walls |
-| **Vegetation** | ~12 tiles | Deciduous trees (green, 3 sizes), autumn trees (orange, 3 sizes), bushes, tree stumps, mushrooms |
-| **Props** | ~15 tiles | Wood fences (H/V/corners), well, signposts, barrels, crates, torches, market stall components |
-| **Characters** | ~6 sprites | Distinct overworld character designs |
-| **Tilemap** | 2 files | `tilemap.png` (individual tiles), `tilemap_packed.png` (packed spritesheet) |
+### Buildings & Objects: MinyWorld Sprites
+- **Source:** `Design Assets/MinyWorld Assets/MiniWorldSprites/`
+- **Buildings:** 11 categories (Houses, Huts, Taverns, Market, Workshops, Keep, Tower, Barracks, Chapels, Resources, Docks) × 5 color variants (Wood, Cyan, Lime, Purple, Red)
+- **Nature:** Trees, Pine Trees, Dead Trees, Rocks, Wheatfield, Coconut Trees, Cactus, Winter Trees
+- **Misc:** Well, Bridge, Signs, Chests, Quest Board, Tombstones, Boats, Portal
+- **All sprites:** 16×16 pixels, single tile per complete component
+- **License:** CC0
 
-**Tile size:** 16x16 pixels
-**License:** CC0 1.0 — free for personal, educational, and commercial use
+### Characters: MinyWorld Champions & Workers
+- **Champions (5 for agents):** Arthax, Kanji, Katan, Okomo, Zhinja — 16×16 spritesheets with walk animations
+- **Workers (player):** FarmerTemplate — 80×192px (5 cols × 12 rows), 4-directional walk
+- **License:** CC0
 
-### 2.2 Kenney Tiny Dungeon
+### Kenney UI Pack Pixel Adventure (retained)
+- **Source:** `Design Assets/Kenney Assets/kenney_ui-pack-pixel-adventure/`
+- **Use:** UI panels, buttons, progress bars, icons — still used for HUD elements
+- **License:** CC0
 
-| Category | Count | Details |
-|----------|-------|---------|
-| **Floors** | ~8 tiles | Stone floor variants, dirt, sand, water puddles |
-| **Walls** | ~12 tiles | Stone walls, brick walls, cave walls, doorways |
-| **Furniture** | ~20 tiles | Beds, tables, chairs, bookshelves, barrels, chests, cabinets, mirrors |
-| **Props** | ~15 tiles | Torches, candles, ladders, keys, potions, skulls, cobwebs |
-| **Characters** | ~20 sprites | Wizards, scholars, hooded figures, warriors, knights, merchants, skeletons, ghosts |
-| **Tilemap** | 2 files | `tilemap.png`, `tilemap_packed.png` |
-
-**Tile size:** 16x16 pixels
-**License:** CC0 1.0
-
-**Primary use:** Character sprite variety for AI agents and ambient NPCs. Interior scenes are out of scope for MVP but the assets are available for future expansion.
-
-### 2.3 Kenney UI Pack Pixel Adventure
-
-| Category | Count | Details |
-|----------|-------|---------|
-| **Panels** | ~40 elements | Dialog boxes, info panels, tooltips (two visual themes) |
-| **Buttons** | ~60 elements | Square, round, rectangular in multiple colors and states (normal, hover, pressed) |
-| **Progress bars** | ~20 elements | Health bars, XP bars, loading indicators |
-| **Icons** | ~30 elements | Arrows, checkmarks, crosses, stars, hearts, settings |
-| **Frames** | ~40 elements | Circular, hexagonal, diamond portrait frames |
-| **Misc** | ~50 elements | Sliders, toggles, tabs, badges, ribbons |
-
-**Two visual themes:** "Warm" (brown/gold/parchment) and "Cool" (blue/silver/slate)
-**License:** CC0 1.0
-
-### 2.4 Kenney UI Audio
-
-| Category | Count | Details |
-|----------|-------|---------|
-| **Click sounds** | ~15 SFX | Button press, release, toggle variations |
-| **Hover sounds** | ~10 SFX | Subtle hover feedback |
-| **Navigation** | ~10 SFX | Menu open, close, tab switch |
-| **Feedback** | ~16 SFX | Success, error, notification, coin |
-
-**Format:** OGG + WAV
-**License:** CC0 1.0
+### Kenney UI Audio (retained)
+- **Source:** `Design Assets/Kenney Assets/kenney_ui-audio/`
+- **Use:** Click, hover, navigation, and feedback SFX
+- **License:** CC0
 
 ---
 
@@ -554,65 +527,24 @@ The UI pack contains individual PNG elements. These need to be:
 
 ## 10. Tiled Map Technical Specification
 
-### 10.1 New Map File
+### Map Dimensions
+- **Size:** 100×100 tiles (1,600×1,600 pixels)
+- **Tile size:** 16×16 pixels
 
-**File:** `public/maps/arboria/arboria-market-town.json` (replaces existing)
+### Tileset
+- **Name:** `punyworld-overworld`
+- **Image:** `punyworld-overworld-tileset.png` (432×1040px)
+- **Tile count:** 1,755
+- **Columns:** 27
 
-| Property | Value |
-|----------|-------|
-| Width | 64 tiles |
-| Height | 64 tiles |
-| Tile size | 16x16 px |
-| Tileset | `tilemap_packed.png` from Kenney Tiny Town |
-| Orientation | Orthogonal |
-| Render order | Right-down |
+### Layers
+1. `ground` (tilelayer) — Grass variants with procedural variation
+2. `paths` (tilelayer) — Dirt paths, tree tiles, water tiles using Puny World GIDs
+3. `collisions` (tilelayer) — Invisible collision markers
+4. `interactions` (objectgroup) — Buildings, agents, player spawn, lots
 
-### 10.2 Tileset Configuration
-
-The new tileset reference in the Tiled JSON:
-
-```json
-{
-  "columns": 12,
-  "image": "../../sprites/tiles/tilemap_packed.png",
-  "imageheight": 192,
-  "imagewidth": 192,
-  "margin": 0,
-  "name": "kenney-tiny-town",
-  "spacing": 0,
-  "tilecount": 132,
-  "tileheight": 16,
-  "tilewidth": 16
-}
-```
-
-### 10.3 Collision Tile Convention
-
-Maintain the existing convention:
-- Tile GID `0` = empty (passable)
-- A designated tile GID = wall (impassable)
-- Collision layer remains invisible at runtime
-- Buildings, water, dense trees, and fences all get collision tiles
-
-### 10.4 Interaction Object Layer
-
-Objects in the interaction layer:
-
-```json
-[
-  { "name": "player_spawn", "type": "spawn", "x": 512, "y": 960 },
-  { "name": "Mira", "type": "agent", "x": 512, "y": 896 },
-  { "name": "Ledger", "type": "agent", "x": 480, "y": 640 },
-  { "name": "Archon", "type": "agent", "x": 720, "y": 288 },
-  { "name": "Forge", "type": "agent", "x": 720, "y": 480 },
-  { "name": "Ember", "type": "agent", "x": 240, "y": 384 },
-  { "name": "Guard", "type": "ambient_npc", "x": 480, "y": 944 },
-  { "name": "Traveler", "type": "ambient_npc", "x": 560, "y": 928 },
-  ... (all 12 ambient NPCs)
-]
-```
-
-Coordinates are approximate — final positions determined during Tiled map design.
+### Building Rendering
+Buildings are NOT tile GIDs. They are object layer entries with `spriteKey` and `frame` properties. The `BuildingManager` class reads these and creates Phaser sprites at runtime.
 
 ---
 
@@ -658,39 +590,22 @@ Coordinates are approximate — final positions determined during Tiled map desi
 
 ## 12. Migration from Current Assets
 
-### 12.1 What Gets Preserved
+### Replaced
+- Kenney Tiny Town tileset (`tilemap_packed.png`) → Puny World terrain tileset
+- Kenney multi-tile building GIDs → MinyWorld single-tile building sprites
+- Generic NPC spritesheets → MinyWorld Champion character sprites
+- 64×64 tile map → 100×100 tile map
 
-- All Phaser engine code (phaserConfig, scenes, controllers)
+### Architecture Change
+- **Before:** Single tileset, all content (terrain + buildings + decorations) as tile GIDs in tilemap layers
+- **After:** Hybrid — Puny World tileset for terrain layers + MinyWorld sprites for buildings/objects via object layer + BuildingManager
+
+### Preserved
 - Weather, lighting, and season systems (asset-independent)
 - Zustand store and state management
-- HUD component structure (re-skinned, not rebuilt)
-- NPC proximity detection logic (reused for both agent and ambient systems)
 - Supabase integration for agent data
-- Player controller (WASD movement, collision)
-
-### 12.2 What Gets Replaced
-
-- Tileset image and all tile references
-- Character sprites (all 4 current files)
-- Map JSON (complete redesign in Tiled)
-- NPC seed data (3 agents → 5 agents)
-- HUD styling (Tailwind → pixel art panels)
-
-### 12.3 What Gets Added
-
-- Ambient NPC system (12 NPCs with speech bubbles)
-- Lot management system (runtime tile patching)
-- Audio system (SFX for UI interactions)
-- Sprite atlas (combined character sheet)
-- UI atlas (pixel art interface elements)
-- Agent model routing (OpenRouter model IDs per agent)
-
-### 12.4 Migration Safety
-
-- The current `arboria-market-town.json` map and placeholder sprites can be git-archived before replacement
-- No database schema breaking changes — new columns are additive
-- The Phaser engine itself requires zero changes — only scene configuration and asset references update
-- Weather, lighting, and season overlays are rendered independently of the tileset and continue working without modification
+- Player controller logic (WASD movement, collision — sprite key updated)
+- NPC proximity detection logic (sprite key and idle animation updated)
 
 ---
 
