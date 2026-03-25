@@ -140,7 +140,7 @@
               {"name":"zone","type":"string","value":"market_square"},
               {"name":"role","type":"string","value":"finance"}
             ]},
-           {"id":4,"name":"Archon","type":"agent","x":224,"y":80,"width":16,"height":16,
+           {"id":4,"name":"Archon","type":"agent","x":224,"y":64,"width":16,"height":16,
             "properties":[
               {"name":"agentId","type":"string","value":"agent-archon"},
               {"name":"agentName","type":"string","value":"Archon"},
@@ -148,7 +148,7 @@
               {"name":"zone","type":"string","value":"scholars_quarter"},
               {"name":"role","type":"string","value":"academia"}
             ]},
-           {"id":5,"name":"Forge","type":"agent","x":224,"y":192,"width":16,"height":16,
+           {"id":5,"name":"Forge","type":"agent","x":208,"y":208,"width":16,"height":16,
             "properties":[
               {"name":"agentId","type":"string","value":"agent-forge"},
               {"name":"agentName","type":"string","value":"Forge"},
@@ -156,7 +156,7 @@
               {"name":"zone","type":"string","value":"craftsmen_row"},
               {"name":"role","type":"string","value":"programming"}
             ]},
-           {"id":6,"name":"Ember","type":"agent","x":48,"y":192,"width":16,"height":16,
+           {"id":6,"name":"Ember","type":"agent","x":48,"y":208,"width":16,"height":16,
             "properties":[
               {"name":"agentId","type":"string","value":"agent-ember"},
               {"name":"agentName","type":"string","value":"Ember"},

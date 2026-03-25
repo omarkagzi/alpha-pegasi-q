@@ -107,6 +107,14 @@ export class SettlementScene extends Phaser.Scene {
       ? objectLayer.objects.filter((o) => o.type === "agent")
       : [];
     this.npcManager = new NpcManager(this, npcObjects, this.playerController.sprite);
+
+    // 9a. NPC collision with tile layers (same as player)
+    for (const npcSprite of this.npcManager.getNpcSprites()) {
+      for (const layer of collisionLayers) {
+        this.physics.add.collider(npcSprite, layer);
+      }
+    }
+
     this.fetchAndEnrichAgents();
 
     // 9. Set camera bounds to map dimensions
