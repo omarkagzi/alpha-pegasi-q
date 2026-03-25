@@ -35,7 +35,7 @@ export class SettlementScene extends Phaser.Scene {
     // 1. Load tilemap
     const map = this.make.tilemap({ key: TILEMAP.key });
 
-    // 2. Add MinyWorld ground tileset
+    // 2. Add Arboria full tileset (AllAssetsPreview.png)
     const tileset = map.addTilesetImage(TERRAIN.key, TERRAIN.key);
 
     if (!tileset) {
@@ -51,21 +51,26 @@ export class SettlementScene extends Phaser.Scene {
       return;
     }
 
-    // 3. Create terrain layer
-    const groundLayer = map.createLayer("ground", tileset);
-    groundLayer?.setDepth(0);
+    // 3. Create tile layers (matching Tiled export layer names)
+    const grassLayer = map.createLayer("Grass", tileset);
+    const wallLayer = map.createLayer("Wall Structure", tileset);
+    const buildingsLayer = map.createLayer("Buildings", tileset);
+    const treeLayer = map.createLayer("Tree", tileset);
 
-    // 4. Collision layer (invisible)
-    const collisionLayer = map.createLayer("collisions", tileset);
-    if (collisionLayer) {
-      collisionLayer.setVisible(false);
-      collisionLayer.setCollisionByExclusion([-1, 0]);
-    }
+    grassLayer?.setDepth(0);
+    wallLayer?.setDepth(1);
+    buildingsLayer?.setDepth(2);
+    treeLayer?.setDepth(3);
+
+    // 4. Collision — wall and building tiles block the player
+    wallLayer?.setCollisionByExclusion([-1, 0]);
+    buildingsLayer?.setCollisionByExclusion([-1, 0]);
+    treeLayer?.setCollisionByExclusion([-1, 0]);
 
     // 5. Get object layer
     const objectLayer = map.getObjectLayer("interactions");
-    let spawnX = 49 * 16;
-    let spawnY = 65 * 16;
+    let spawnX = 9 * 16;  // center of 18-wide map
+    let spawnY = 16 * 16; // near south gate
 
     if (objectLayer) {
       const spawnObj = objectLayer.objects.find((o) => o.type === "player_spawn");
@@ -85,9 +90,12 @@ export class SettlementScene extends Phaser.Scene {
     // 7. Create player
     this.playerController = new PlayerController(this, spawnX, spawnY);
 
-    // 8. Collisions — player vs tile collision layer + building sprites
-    if (collisionLayer) {
-      this.physics.add.collider(this.playerController.sprite, collisionLayer);
+    // 8. Collisions — player vs wall/building/tree tile layers + building sprites
+    const collisionLayers = [wallLayer, buildingsLayer, treeLayer].filter(
+      (l): l is Phaser.Tilemaps.TilemapLayer => l !== null
+    );
+    for (const layer of collisionLayers) {
+      this.physics.add.collider(this.playerController.sprite, layer);
     }
     this.physics.add.collider(
       this.playerController.sprite,
@@ -117,7 +125,7 @@ export class SettlementScene extends Phaser.Scene {
     weatherEngine.start();
 
     // Track layers for dynamic season tint updates
-    this.tintedLayers = [groundLayer].filter(
+    this.tintedLayers = [grassLayer, wallLayer, buildingsLayer, treeLayer].filter(
       (l): l is Phaser.Tilemaps.TilemapLayer => l !== null
     );
 

@@ -117,9 +117,62 @@
          "width":18,
          "x":0,
          "y":0
+        },
+        {
+         "draworder":"topdown",
+         "id":6,
+         "name":"interactions",
+         "objects":[
+           {"id":1,"name":"Player Spawn","type":"player_spawn","x":144,"y":256,"width":16,"height":16},
+           {"id":2,"name":"Mira","type":"agent","x":112,"y":128,"width":16,"height":16,
+            "properties":[
+              {"name":"agentId","type":"string","value":"agent-mira"},
+              {"name":"agentName","type":"string","value":"Mira"},
+              {"name":"sprite","type":"string","value":"chr-arthax"},
+              {"name":"zone","type":"string","value":"market_square"},
+              {"name":"role","type":"string","value":"guide"}
+            ]},
+           {"id":3,"name":"Ledger","type":"agent","x":160,"y":128,"width":16,"height":16,
+            "properties":[
+              {"name":"agentId","type":"string","value":"agent-ledger"},
+              {"name":"agentName","type":"string","value":"Ledger"},
+              {"name":"sprite","type":"string","value":"chr-kanji"},
+              {"name":"zone","type":"string","value":"market_square"},
+              {"name":"role","type":"string","value":"finance"}
+            ]},
+           {"id":4,"name":"Archon","type":"agent","x":224,"y":80,"width":16,"height":16,
+            "properties":[
+              {"name":"agentId","type":"string","value":"agent-archon"},
+              {"name":"agentName","type":"string","value":"Archon"},
+              {"name":"sprite","type":"string","value":"chr-katan"},
+              {"name":"zone","type":"string","value":"scholars_quarter"},
+              {"name":"role","type":"string","value":"academia"}
+            ]},
+           {"id":5,"name":"Forge","type":"agent","x":224,"y":192,"width":16,"height":16,
+            "properties":[
+              {"name":"agentId","type":"string","value":"agent-forge"},
+              {"name":"agentName","type":"string","value":"Forge"},
+              {"name":"sprite","type":"string","value":"chr-okomo"},
+              {"name":"zone","type":"string","value":"craftsmen_row"},
+              {"name":"role","type":"string","value":"programming"}
+            ]},
+           {"id":6,"name":"Ember","type":"agent","x":48,"y":192,"width":16,"height":16,
+            "properties":[
+              {"name":"agentId","type":"string","value":"agent-ember"},
+              {"name":"agentName","type":"string","value":"Ember"},
+              {"name":"sprite","type":"string","value":"chr-zhinja"},
+              {"name":"zone","type":"string","value":"commons"},
+              {"name":"role","type":"string","value":"roleplay"}
+            ]}
+         ],
+         "opacity":1,
+         "type":"objectgroup",
+         "visible":true,
+         "x":0,
+         "y":0
         }],
- "nextlayerid":6,
- "nextobjectid":1,
+ "nextlayerid":7,
+ "nextobjectid":7,
  "orientation":"orthogonal",
  "renderorder":"right-down",
  "tiledversion":"1.12.0",
@@ -128,7 +181,7 @@
         {
          "columns":71,
          "firstgid":1,
-         "image":"..\/Project_Alpha_Pegasi_q\/Design Assets\/MinyWorld Assets\/MiniWorldSprites\/AllAssetsPreview.png",
+         "image":"..\/..\/sprites\/tiles\/AllAssetsPreview.png",
          "imageheight":304,
          "imagewidth":1136,
          "margin":0,

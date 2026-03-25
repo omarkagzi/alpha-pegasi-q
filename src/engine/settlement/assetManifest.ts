@@ -1,22 +1,22 @@
 // src/engine/settlement/assetManifest.ts
 
 /**
- * Asset manifest — single source of truth for all MinyWorld + Puny World
+ * Asset manifest — single source of truth for all MinyWorld
  * asset keys, paths, and frame dimensions.
  *
  * ALL other files import from here. No magic strings for asset keys.
  */
 
-// ── Terrain Tileset (MinyWorld Ground) ────────────────────────────
+// ── Terrain Tileset (Arboria Full — AllAssetsPreview.png) ─────────
 export const TERRAIN = {
-  key: "minyworld-ground",
-  path: "/sprites/tiles/minyworld-ground.png",
+  key: "Arboria - Full tileset",
+  path: "/sprites/tiles/AllAssetsPreview.png",
   tileWidth: 16,
   tileHeight: 16,
-  columns: 2,
-  tileCount: 2,
-  imageWidth: 32,
-  imageHeight: 16,
+  columns: 71,
+  tileCount: 1349,
+  imageWidth: 1136,
+  imageHeight: 304,
 } as const;
 
 // ── Building Spritesheets (MinyWorld) ─────────────────────────────
@@ -86,8 +86,8 @@ export const ANIMALS = {
 
 // ── Tilemap ───────────────────────────────────────────────────────
 export const TILEMAP = {
-  key: "arboria-market-town",
-  path: "/maps/arboria/arboria-market-town.json",
+  key: "arboria-walled-city",
+  path: "/maps/arboria/Walled City Map - Arboria.json",
 } as const;
 
 // ── Helper: Get all spritesheet entries for bulk loading ──────────
