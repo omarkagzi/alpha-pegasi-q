@@ -1,10 +1,12 @@
+> **⚠️ PARTIALLY SUPERSEDED** — The Puny World terrain approach described here has been superseded. MinyWorld is now the **sole canonical asset pack** for all assets (buildings, characters, terrain, nature). The AllAssetsPreview.png tileset is used for terrain in Tiled maps. See the [2026-03-24 Walled City Map plan](./2026-03-24-minyworld-walled-city-map.md) for the current map approach.
+
 # MinyWorld + Puny World Asset Migration Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace all Kenney Tiny Town assets with MinyWorld (buildings, characters, objects) + Puny World (terrain) assets, producing a visually rich ~100×100 settlement map inspired by the MinyWorld example maps.
+**Goal:** Replace all Kenney Tiny Town assets with MinyWorld (buildings, characters, objects) assets, producing a visually rich ~100×100 settlement map inspired by the MinyWorld example maps.
 
-**Architecture:** Hybrid tilemap + sprite approach. Puny World's 1,755-tile tileset handles all terrain via standard Tiled tilemap layers (ground, paths, water, cliffs, forest edges) using its built-in Wang auto-tiling rules. MinyWorld buildings, nature, and objects are loaded as individual Phaser sprite textures and placed via the Tiled object layer — eliminating multi-tile GID assembly entirely. Characters remain as Phaser spritesheets with walk animations.
+**Architecture:** MinyWorld tileset handles all terrain via standard Tiled tilemap layers. MinyWorld buildings, nature, and objects are loaded as individual Phaser sprite textures and placed via the Tiled object layer. Characters remain as Phaser spritesheets with walk animations.
 
 **Tech Stack:** Phaser 3, TypeScript, Tiled JSON format, Node.js build scripts
 

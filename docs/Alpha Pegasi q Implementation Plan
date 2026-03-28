@@ -16,7 +16,7 @@ Build the Alpha Pegasi q MVP — a persistent, scalable, browser-based digital w
 - **Telemetry**: PostHog.
 - **3D Engine (Orbital View)**: Three.js via `react-three-fiber` + `@react-three/drei`.
 - **2D Engine (Settlement View)**: Phaser 3 (for WASD movement, camera, tile-based rendering) + Tiled (for map editing). *(Version 2 — corrected from RPG JS to match PRD v1.1+)*
-- **Asset Packs**: Kenney Tiny Town + Tiny Dungeon (tiles, buildings, characters), Kenney UI Pack Pixel Adventure (warm theme), Kenney UI Audio (SFX). All CC0. *(Version 2)*
+- **Asset Pack**: MinyWorld (16×16 pixel art) — unified source for all ground tiles, buildings, characters, nature sprites, and decorations. Chosen for breadth of assets, internal visual consistency, and Stardew Valley–inspired aesthetic. *(Version 2 — replaced Kenney packs after testing)*
 
 ## Exhaustive Data Schema (Supabase PostgreSQL)
 
@@ -95,13 +95,13 @@ Build the Alpha Pegasi q MVP — a persistent, scalable, browser-based digital w
 - Place 3 static demo NPCs in the Phaser 3 map with interactive prompt boundaries.
 
 ### Phase 2.5 — Arboria Visual Reimagining *(Version 2)*
-**Scope:** Replace all placeholder art with production-quality Kenney pixel art. Expand agent roster. Add ambient world population. Implement claimable lot system. Audio. UI reskin.
+**Scope:** Replace all placeholder art with production-quality MinyWorld 16×16 pixel art. Expand agent roster. Add ambient world population. Implement claimable lot system. Audio. UI reskin.
 
 **Visual Assets & Map**
-- Replace placeholder tileset with Kenney Tiny Town `tilemap_packed.png` (16x16 tiles, CC0).
-- Redesign Arboria Market Town map in Tiled: 64x64 tiles (up from 50x50), 5 named districts (Town Gate, Market Square, Scholar's Quarter, Craftsmen's Row, Commons Park).
-- Build combined character sprite atlas (`characters.png` + `characters.json`) from Kenney Tiny Town + Tiny Dungeon character pools.
-- Replace player sprite and all NPC sprites with unique, visually distinct Kenney characters.
+- Replace placeholder tileset with MinyWorld ground tiles (16×16).
+- Hand-craft Arboria Walled City map in Tiled: 100×100 tiles with walled city center, surrounding countryside, rivers, farmland, and forests.
+- Use MinyWorld character spritesheets for player (farmer) and all NPC agents (arthax, kanji, katan, okomo, zhinja).
+- Use MinyWorld building spritesheets (houses, huts, taverns, market, workshops, keep, tower, barracks, chapels, etc.).
 
 **Platform Agents (3 → 5)**
 - Expand from 3 demo agents to 5 platform agents: Mira (guide), Ledger (finance), Archon (academia), Forge (programming), Ember (roleplay).
@@ -120,12 +120,12 @@ Build the Alpha Pegasi q MVP — a persistent, scalable, browser-based digital w
 - On scene load, query `properties` table and patch tilemap layers with claimed house tiles and agent sprites.
 
 **Audio**
-- Implement `audioManager.ts` — load Kenney UI Audio SFX in BootScene.
+- Implement `audioManager.ts` — load CC0 UI Audio SFX in BootScene.
 - 7 trigger types: proximity chime, panel open/close, button click, message received, hover, NPC bubble pop.
 - Global mute toggle persisted in localStorage. Default volume 30%.
 
 **UI Reskin**
-- Re-skin settlement HUD, interaction prompts, and breadcrumb with Kenney UI Pack Pixel Adventure (warm/parchment theme).
+- Re-skin settlement HUD, interaction prompts, and breadcrumb with a warm pixel art theme consistent with MinyWorld visual direction.
 - Design chat overlay and agent registration UI components (implemented in Phases 3 and 4 respectively).
 
 ### Phase 3 — Agent Interaction

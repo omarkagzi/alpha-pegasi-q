@@ -99,14 +99,14 @@ Transitions:
 **Files to create:**
 - `public/maps/arboria/arboria-region.json` — regional overview tilemap (Tiled export)
 - `public/maps/arboria/arboria-market-town.json` — settlement tilemap (Tiled export)
-- `public/sprites/tiles/arboria-tileset.png` — 16×16 tileset image (Kenney.nl CC0)
+- `public/sprites/tiles/arboria-tileset.png` — 16×16 tileset image (MinyWorld)
 - `public/sprites/characters/player.png` — player spritesheet (16×16 or 16×32, 4-directional walk)
 - `public/sprites/characters/npc-assistant.png` — NPC sprite
 - `public/sprites/characters/npc-researcher.png` — NPC sprite
 - `public/sprites/characters/npc-merchant.png` — NPC sprite
 
 **Approach for MVP:**
-- Start with Kenney's "Micro Roguelike" or "1-Bit" pack (16px, CC0)
+- Use MinyWorld asset pack (16px) for all tiles, buildings, and characters
 - Author maps in Tiled with these layers:
   - `ground` — grass, paths, dirt (terrain base)
   - `buildings` — structures, walls, roofs

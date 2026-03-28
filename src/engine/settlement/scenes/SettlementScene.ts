@@ -35,7 +35,7 @@ export class SettlementScene extends Phaser.Scene {
     // 1. Load tilemap
     const map = this.make.tilemap({ key: TILEMAP.key });
 
-    // 2. Add Arboria full tileset (AllAssetsPreview.png)
+    // 2. Add MinyWorld full tileset (AllAssetsPreview.png)
     const tileset = map.addTilesetImage(TERRAIN.key, TERRAIN.key);
 
     if (!tileset) {

@@ -7,7 +7,7 @@
  * ALL other files import from here. No magic strings for asset keys.
  */
 
-// ── Terrain Tileset (Arboria Full — AllAssetsPreview.png) ─────────
+// ── Terrain Tileset (MinyWorld — AllAssetsPreview.png) ────────────
 export const TERRAIN = {
   key: "Arboria - Full tileset",
   path: "/sprites/tiles/AllAssetsPreview.png",

@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Status | Draft — Active |
-| Version | v2.0 |
+| Version | v2.1 |
 | Date | March 2026 |
 | Owner | Founder / Platform Governor |
 | Target Build | Claude Code (Anthropic) |
@@ -400,13 +400,12 @@ The governance model is layered:
 | **Map Editor** | Tiled | Authored tilemap JSON consumed natively by Phaser 3. Manages terrain layers, collision masks, NPC spawn zones, and interaction regions. |
 | **Real-Time Layer** | Supabase Realtime | Agent activity, world events, live population data. Incoming state updates are buffered and applied on the Phaser game loop tick — not directly in WebSocket callbacks — to prevent race conditions with the render loop. |
 | **Styling** | Tailwind CSS + custom GLSL shaders | UI components + planet/biome visual effects |
-| **Backend** | Node.js + Express | API gateway, agent orchestration, economy engine |
+| **Backend** | Next.js App Router (API Routes) | API gateway, agent orchestration, economy engine. Hosted on Vercel. |
 | **Primary Database** | PostgreSQL | Agent registry, accounts, economy, world state |
 | **Cache / Sessions** | Redis (Upstash) | Session management, world state caching |
 | **Authentication** | Clerk (`@clerk/nextjs`) | Email/password and OAuth providers (Google, GitHub) |
-| **Base Asset Library** | Kenney.nl (CC0) | Ground tiles, structures, paths, and UI elements. Zero licensing cost. Consistent art style for use as the foundational tileset layer. |
-| **Character Sprites** | Universal LPC Spritesheet Generator | Standardized 64×64 NPC and player avatar sprites with walk, idle, and interact animation cycles. Output is Phaser-compatible. |
-| **Pixel Art Editing** | LibreSprite | Sprite cleanup, animation frame editing, and palette unification. All assets from mixed sources are run through a single 32-color palette before Tiled import to ensure visual consistency. |
+| **Asset Pack** | MinyWorld (16×16 pixel art) | Unified asset source for all ground tiles, buildings, characters, nature sprites, and decorations. Chosen for breadth of assets, internal visual consistency, and alignment with the Stardew Valley–inspired world vision. 16×16 tile size throughout. |
+| **Pixel Art Editing** | LibreSprite | Sprite cleanup, animation frame editing, and palette unification when needed. |
 | **Payments** | Stripe | Steward subscription + World Credit purchases |
 | **AI Integration** | Direct API calls (server-side) | Platform acts as orchestrator; agent keys never exposed to client |
 | **Deployment** | Vercel (frontend) + Supabase or Railway (PostgreSQL) + Upstash (Redis) | Low-cost, scalable, zero DevOps overhead at MVP scale |
@@ -557,7 +556,7 @@ The MVP must feel like a real world, not a prototype. It will be small — one f
 - 3D rotating planet in space with 15 biome regions visible (textured, labeled, clickable)
 - Day/night cycle visible from orbit
 - Full 2D pixel-art regional map for Arboria (Temperate Deciduous Forest)
-- Full top-down WASD settlement view for one Arboria market town — 64x64 tile map (1024x1024 px) with production-quality Kenney pixel art *(Version 2 — expanded from 50x50 placeholder art)*
+- Full top-down WASD settlement view for one Arboria walled city — 100×100 tile map (1600×1600 px) with MinyWorld pixel art. Maps are hand-crafted in Tiled. *(Version 2 — expanded from original placeholder)*
 - Weather and day/night cycle functioning in Arboria
 
 **Agents**
@@ -574,18 +573,17 @@ The MVP must feel like a real world, not a prototype. It will be small — one f
 - Ambient NPCs have no name labels — visual distinction from AI agents
 - World-aware dialogue lines referencing agents, biomes, credits, and seasons
 
-**Settlement Districts (Version 2)**
-- Arboria Market Town organized into 5 named districts: Town Gate, Market Square, Scholar's Quarter, Craftsmen's Row, Commons Park
-- 18 claimable empty lots distributed across districts for Steward agent registration
+**Claimable Lots (Version 2)**
+- Claimable empty lots distributed across the settlement for Steward agent registration
 - Lots rendered dynamically at runtime via tile patching — not baked into the Tiled map export
 
 **Audio (Version 2)**
 - UI sound effects for agent proximity, chat open/close, message send/receive, NPC speech bubbles
 - Global mute toggle persisted in localStorage
-- All SFX sourced from Kenney UI Audio (CC0)
+- SFX sourced from MinyWorld-compatible audio packs or CC0 sources
 
 **In-World UI (Version 2)**
-- Settlement HUD, interaction prompts, and chat overlay styled with Kenney UI Pack Pixel Adventure (warm/parchment theme)
+- Settlement HUD, interaction prompts, and chat overlay styled with a warm pixel art theme consistent with MinyWorld visual direction
 - Replaces raw Tailwind CSS overlays for all in-world interface elements
 
 **Accounts & Economy**
@@ -625,7 +623,7 @@ The MVP must feel like a real world, not a prototype. It will be small — one f
 | **Phase 0 — Foundation** | Weeks 1–2 | Project scaffolding. Next.js + Three.js setup. Database schema. Authentication. Vercel deployment pipeline. |
 | **Phase 1 — The Planet** | Weeks 3–4 | 3D rotating sphere. 15 biome regions textured and labeled. Day/night cycle. Zoom transition to 2D map skeleton. |
 | **Phase 2 — Arboria** | Weeks 5–7 | Full 2D pixel-art regional map. Top-down WASD settlement. Weather and lighting. Three demo agents placed. |
-| **Phase 2.5 — Arboria Visual Reimagining** *(Version 2)* | Weeks 7–8 | Replace all placeholder art with Kenney pixel art. Redesign 64x64 district-based map. Expand to 5 platform agents with OpenRouter model assignments. Add 12 ambient NPCs with speech bubbles. Implement 18 claimable empty lots with runtime tile patching. Add UI SFX audio system. Re-skin HUD and interaction prompts with pixel art UI pack. |
+| **Phase 2.5 — Arboria Visual Reimagining** *(Version 2)* | Weeks 7–8 | Replace all placeholder art with MinyWorld 16×16 pixel art. Hand-craft 100×100 walled city map in Tiled. Expand to 5 platform agents with OpenRouter model assignments. Add ambient NPCs with speech bubbles. Implement claimable empty lots with runtime tile patching. Add UI SFX audio system. Re-skin HUD and interaction prompts with pixel art theme. |
 | **Phase 3 — Agent Interaction** | Weeks 9–10 | Text conversation with agents. Interaction memory. Sentiment classification. Agent status system. |
 | **Phase 4 — Economy & Accounts** | Weeks 11–12 | Stripe integration. World Credits. Steward account. Agent registration flow with sprite/house/lot selection. Biome recommendation engine. |
 | **Phase 5 — Polish & Launch** | Weeks 13–14 | Performance optimization. Mobile responsive shell. Bug fixes. Admin panel. Soft launch. |
@@ -734,8 +732,9 @@ Compliance is not the primary concern at MVP launch, but the following baseline 
 | Version | Date | Author | Changes |
 |---|---|---|---|
 | v1.0 | March 2026 | Founder + Claude (Anthropic) | Initial PRD created from founder Q&A session. Full world design, agent system, economy, technical architecture, and MVP definition. |
-| v1.1 | March 2026 | Founder + Claude (Anthropic) | Stack corrections and additions following Phase 1 completion review. (1) Auth updated from NextAuth.js to Clerk. (2) Real-time layer updated from Socket.io to Supabase Realtime. (3) 2D game layer locked to Phaser 3 explicitly. (4) Tiled added as map editor. (5) Asset pipeline defined: Kenney.nl + Universal LPC Spritesheet Generator + LibreSprite. (6) "First-person" settlement view terminology corrected to "top-down" throughout. (7) Section 8.2 added: Canvas Orchestration Architecture — Three.js and Phaser 3 renderer boundary. Sections 8.2–8.7 renumbered to 8.3–8.8 accordingly. |
-| v2.0 | March 2026 | Founder + Claude (Anthropic) | Phase 2.5 — Arboria Visual Reimagining. All changes marked *(Version 2)* inline. (1) Platform agent roster expanded from 3 to 5 with specific OpenRouter free-tier model assignments. (2) 12 ambient NPCs added — non-AI characters with proximity speech bubbles for world-building. (3) Settlement map upgraded from 50x50 to 64x64 tiles with 5 named districts. (4) 18 claimable empty lots with runtime tile patching system for Steward agent registration. (5) Manual governor approval for agent registration replaced by immediate world placement. (6) Audio system added — Kenney UI Audio SFX for proximity, chat, and navigation. (7) In-world UI reskinned from raw Tailwind to Kenney UI Pack Pixel Adventure (warm theme). (8) Phase 2.5 added to MVP Build Phases. Phases 3–5 timelines shifted accordingly. (9) Companion design spec: `docs/superpowers/specs/2026-03-19-arboria-visual-reimagining-design.md`. |
+| v1.1 | March 2026 | Founder + Claude (Anthropic) | Stack corrections and additions following Phase 1 completion review. (1) Auth updated from NextAuth.js to Clerk. (2) Real-time layer updated from Socket.io to Supabase Realtime. (3) 2D game layer locked to Phaser 3 explicitly. (4) Tiled added as map editor. (5) Asset pipeline defined with LibreSprite for sprite editing. (6) "First-person" settlement view terminology corrected to "top-down" throughout. (7) Section 8.2 added: Canvas Orchestration Architecture — Three.js and Phaser 3 renderer boundary. Sections 8.2–8.7 renumbered to 8.3–8.8 accordingly. |
+| v2.0 | March 2026 | Founder + Claude (Anthropic) | Phase 2.5 — Arboria Visual Reimagining. All changes marked *(Version 2)* inline. (1) Platform agent roster expanded from 3 to 5 with specific OpenRouter free-tier model assignments. (2) Ambient NPCs added — non-AI characters with proximity speech bubbles for world-building. (3) Settlement map redesigned as 100×100 hand-crafted walled city in Tiled. (4) Claimable empty lots with runtime tile patching system for Steward agent registration. (5) Manual governor approval for agent registration replaced by immediate world placement. (6) Audio system added for proximity, chat, and navigation SFX. (7) In-world UI reskinned with warm pixel art theme. (8) Phase 2.5 added to MVP Build Phases. Phases 3–5 timelines shifted accordingly. (9) Companion design spec: `docs/superpowers/specs/2026-03-19-arboria-visual-reimagining-design.md`. |
+| v2.1 | March 2026 | Founder + Claude (Anthropic) | Asset pack consolidation. (1) All asset references consolidated to MinyWorld (16×16 pixel art) as the sole canonical asset pack — replaced Kenney Tiny Town, LPC Spritesheet Generator, and PunyWorld references throughout. (2) Backend stack corrected from "Node.js + Express" to "Next.js App Router (API Routes)" to match actual implementation. (3) Sprite size standardized to 16×16 (previously referenced 64×64 LPC sprites). (4) Map size confirmed at 100×100 tiles. |
 
 ---
 

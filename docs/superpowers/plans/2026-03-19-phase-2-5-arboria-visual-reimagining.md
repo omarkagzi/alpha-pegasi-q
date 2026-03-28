@@ -1,4 +1,4 @@
-> **⚠️ SUPERSEDED** — This plan has been replaced by [2026-03-23 MinyWorld + Puny World Asset Migration](./2026-03-23-minyworld-punyworld-asset-migration.md). The Kenney Tiny Town approach was abandoned due to multi-tile assembly complexity. MinyWorld single-tile buildings + Puny World terrain provide a better path.
+> **⚠️ SUPERSEDED** — This plan has been fully superseded. The Kenney Tiny Town approach was abandoned. MinyWorld is now the sole canonical asset pack. See [2026-03-24 Walled City Map plan](./2026-03-24-minyworld-walled-city-map.md) for the current approach.
 
 # Phase 2.5 — Arboria Visual Reimagining Implementation Plan
 

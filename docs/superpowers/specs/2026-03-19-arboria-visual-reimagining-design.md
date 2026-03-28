@@ -1,3 +1,5 @@
+> **⚠️ SUPERSEDED** — This spec references Kenney Tiny Town and Puny World assets which have been fully replaced. MinyWorld is now the sole canonical asset pack. See the [Walled City Map plan](../plans/2026-03-24-minyworld-walled-city-map.md) and the [NPC Wandering spec](./2026-03-25-npc-simple-wandering-design.md) for current designs.
+
 # Arboria Market Town — Full Visual Reimagining
 
 ## Design Specification
