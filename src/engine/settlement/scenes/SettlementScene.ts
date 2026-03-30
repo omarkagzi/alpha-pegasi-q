@@ -53,24 +53,32 @@ export class SettlementScene extends Phaser.Scene {
 
     // 3. Create tile layers (matching Tiled export layer names)
     const grassLayer = map.createLayer("Grass", tileset);
+    const roadLayer = map.createLayer("Road", tileset);
+    const waterLayer = map.createLayer("Water", tileset);
     const wallLayer = map.createLayer("Wall Structure", tileset);
     const buildingsLayer = map.createLayer("Buildings", tileset);
     const treeLayer = map.createLayer("Tree", tileset);
+    const wheatLayer = map.createLayer("Wheat", tileset);
 
     grassLayer?.setDepth(0);
-    wallLayer?.setDepth(1);
-    buildingsLayer?.setDepth(2);
-    treeLayer?.setDepth(3);
+    roadLayer?.setDepth(1);
+    waterLayer?.setDepth(2);
+    wallLayer?.setDepth(3);
+    buildingsLayer?.setDepth(4);
+    treeLayer?.setDepth(5);
+    wheatLayer?.setDepth(6);
 
-    // 4. Collision — wall and building tiles block the player
+    // 4. Collision — wall, building, and tree tiles block the player
+    // Water does NOT collide — bridges are placed over water tiles,
+    // and blanket water collision would block bridge crossings.
     wallLayer?.setCollisionByExclusion([-1, 0]);
     buildingsLayer?.setCollisionByExclusion([-1, 0]);
     treeLayer?.setCollisionByExclusion([-1, 0]);
 
     // 5. Get object layer
     const objectLayer = map.getObjectLayer("interactions");
-    let spawnX = 9 * 16;  // center of 18-wide map
-    let spawnY = 16 * 16; // near south gate
+    let spawnX = 29 * 16;  // center of 58-wide map
+    let spawnY = 40 * 16; // near south gate area
 
     if (objectLayer) {
       const spawnObj = objectLayer.objects.find((o) => o.type === "player_spawn");
@@ -133,7 +141,7 @@ export class SettlementScene extends Phaser.Scene {
     weatherEngine.start();
 
     // Track layers for dynamic season tint updates
-    this.tintedLayers = [grassLayer, wallLayer, buildingsLayer, treeLayer].filter(
+    this.tintedLayers = [grassLayer, roadLayer, waterLayer, wallLayer, buildingsLayer, treeLayer, wheatLayer].filter(
       (l): l is Phaser.Tilemaps.TilemapLayer => l !== null
     );
 

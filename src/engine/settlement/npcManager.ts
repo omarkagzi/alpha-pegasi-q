@@ -10,7 +10,7 @@ const WALK_TIMEOUT_MS = 5000;
 const STUCK_THRESHOLD_MS = 500;
 const STUCK_VELOCITY = 1; // px/s
 const TILE_SIZE = 16;
-const MAP_TILES = 18; // map is 18x18
+const MAP_TILES = 58; // map is 58x58
 
 // ── Types ─────────────────────────────────────────────────────────
 type WanderState = "idle" | "walking" | "paused";
@@ -182,9 +182,9 @@ export class NpcManager {
     const offsetX = Math.floor(Math.random() * (WANDER_RADIUS_TILES * 2 + 1)) - WANDER_RADIUS_TILES;
     const offsetY = Math.floor(Math.random() * (WANDER_RADIUS_TILES * 2 + 1)) - WANDER_RADIUS_TILES;
 
-    // Clamp to inner city bounds (tiles 2–15) to keep NPCs away from gate openings
-    const INNER_MIN = 2;
-    const INNER_MAX = MAP_TILES - 3; // 15
+    // Clamp to walled city interior (tiles 19–46) to keep NPCs inside walls
+    const INNER_MIN = 19;
+    const INNER_MAX = 46;
     const targetTileX = Math.max(INNER_MIN, Math.min(INNER_MAX, currentTileX + offsetX));
     const targetTileY = Math.max(INNER_MIN, Math.min(INNER_MAX, currentTileY + offsetY));
 

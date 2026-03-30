@@ -87,7 +87,7 @@ export const ANIMALS = {
 // ── Tilemap ───────────────────────────────────────────────────────
 export const TILEMAP = {
   key: "arboria-walled-city",
-  path: "/maps/arboria/Walled City Map - Arboria.json",
+  path: "/maps/arboria/Walled City Map - Arboria.tmj",
 } as const;
 
 // ── Helper: Get all spritesheet entries for bulk loading ──────────

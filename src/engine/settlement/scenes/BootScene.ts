@@ -31,8 +31,8 @@ export class BootScene extends Phaser.Scene {
       });
     }
 
-    // Region map assets (unchanged)
-    this.load.image("arboria-tiles", "/sprites/tiles/arboria-tileset.png");
+    // Region map assets — reuse MinyWorld tileset for region map
+    this.load.image("arboria-tiles", TERRAIN.path);
     this.load.tilemapTiledJSON("arboria-region", "/maps/arboria/arboria-region.json");
 
     // Settlement tilemap
