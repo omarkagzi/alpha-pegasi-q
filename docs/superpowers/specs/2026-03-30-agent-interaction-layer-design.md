@@ -24,11 +24,19 @@ Both systems share infrastructure: the same LLM provider abstraction, the same c
 | Agent-to-agent interaction | Event-sourced via QStash heartbeat, narrator-generated | Cost-bounded (~300 automated calls/day). Serverless-compatible. No persistent process. |
 | Memory model | 3-tier: event log, relationship graph, agent beliefs | Raw events feed relationships, relationships feed beliefs, beliefs feed conversations. Emergent depth. |
 | Observability | Ambient Phaser visuals + Activity Feed + Agent Journals | Players discover world life by walking around, catch up via bulletin, deep-dive via journals. |
-| LLM provider | Google Gemini API direct (gemini-2.0-flash + flash-lite) | 1,500 free requests/day. More generous than OpenRouter. Direct = lower latency. |
+| LLM provider | Google Gemini API direct (gemini-2.0-flash + flash-lite) | 1,500 free requests/day. More generous than OpenRouter. Direct = lower latency. **PRD Amendment:** The PRD and Implementation Plan specify OpenRouter with per-agent model diversity (Gemini Flash, DeepSeek R1, Qwen Coder, Llama 4 Scout). This spec replaces that with Gemini direct + same-model-different-prompt strategy for cost and reliability reasons. The provider abstraction preserves the ability to reintroduce per-agent model diversity later. |
 | Provider abstraction | Thin interface with swappable implementations | Start Gemini, swap per-agent to OpenRouter/DeepSeek later without code changes. |
 | Hosting | Stay on Vercel + QStash + Supabase | Event-sourced heartbeat is serverless-compatible. No need to migrate to Render. |
 | Personality differentiation | Structural constraints, banned words, few-shot examples, response length variation | Same cheap model powering all 5 agents. Prompt engineering, not model switching, creates distinct voices. |
 | File handling | All agents accept all file types. Client-side extraction. No server storage. | No capability gating. Files processed in-flight and discarded. |
+
+### Phase 2.5 Prerequisites
+
+Phase 3 assumes the following Phase 2.5 work is complete before implementation begins:
+
+- **Migration `0007_platform_agents.sql`** exists and has been applied — replaces the 3 demo agents (Mira, Sage, Vend) with the 5 platform agents (Mira, Forge, Archon, Ledger, Ember)
+- **`personality_prompt` column** exists on the `agents` table (added by Phase 2.5 or by 0007). If Phase 2.5 does not add this column, the `0011_modify_agents_beliefs.sql` migration in this spec must be expanded to include `ADD COLUMN personality_prompt text`
+- **Ambient NPCs, lots, audio, and UI reskin** are complete per the Phase 2.5 scope in the Implementation Plan
 
 ### What This Spec Does NOT Cover
 
@@ -48,12 +56,13 @@ Phase 3 adds 3 new tables and modifies 1 existing table. All existing tables (`u
 
 ### 1.1 Modified Table: `agents`
 
-Add four columns to the existing `agents` table:
+Add columns to the existing `agents` table. If Phase 2.5 has NOT already added `personality_prompt`, include it here:
 
 ```sql
 -- Migration: 0011_modify_agents_beliefs.sql
 
 ALTER TABLE agents
+  ADD COLUMN IF NOT EXISTS personality_prompt text,
   ADD COLUMN beliefs jsonb DEFAULT '{}',
   ADD COLUMN last_heartbeat timestamp,
   ADD COLUMN provider text DEFAULT 'gemini',
@@ -132,6 +141,8 @@ CREATE POLICY "Server can manage relationships" ON relationships
 | `strained` | Triggered by tension events or negative sentiment accumulation | Conflict or friction in the relationship |
 
 Arc stage influences the narrator's prompt — `new` agents are tentative and polite, `close` agents are comfortable and may disagree openly, `strained` agents have visible tension.
+
+**Note on polymorphic foreign keys:** The `entity_a_id` and `entity_b_id` columns have no `REFERENCES` constraint because they can point to either `users(id)` or `agents(id)` depending on the `entity_*_type` column. This is an intentional polymorphic design. Application-level validation must ensure IDs point to existing records. When agents or users are deleted (`ON DELETE CASCADE` on `conversation_sessions` handles that table), orphaned `relationships` rows should be cleaned up by a periodic maintenance query or an application-level cascade in the delete flow.
 
 **Notable moments** — A rolling window of up to 5 entries. Only significant events (tension, milestones, collaborations) are added. These provide the narrator with specific history to reference, preventing generic interactions.
 
@@ -285,6 +296,8 @@ CREATE POLICY "Server can manage sessions" ON conversation_sessions
 ```
 
 File content is NOT stored — only metadata and a brief summary. Files are processed in-flight during the LLM call and discarded.
+
+**Note on user identification:** The `conversation_sessions` table references `users(id)` (UUID) via `user_id`, while the existing `interactions` table references `users(clerk_id)` (text) via `initiator_clerk_id`. When the post-processor writes a summary row to `interactions` on session end, it must look up the user's `clerk_id` from the `users` table using the session's `user_id`. This is a simple join, but the inconsistency should be noted.
 
 **Session lifecycle:**
 
@@ -657,8 +670,8 @@ These operations happen after the response is returned to the client. They do no
   - Extract topic keywords from the conversation (keyword extraction, not LLM)
   - Append new topics to `shared_topics` (deduplicated, max 10)
   - Progress `arc_stage` if threshold crossed (see Section 1.2 thresholds)
-  - Update `aggregate_sentiment` based on running average of per-message sentiments
-- **Reputation update:** Call existing `update_agent_reputation(agent_id, sentiment)` function
+  - Update `aggregate_sentiment` by mapping chat sentiments to relationship sentiments: `helpful`/`friendly` → positive signal (trend toward `warm`), `confused`/`frustrated`/`concerned` → negative signal (trend toward `cool`), `neutral` → no change. The `aggregate_sentiment` value (`warm`/`neutral`/`cool`/`tense`) is updated based on the trend over the last 5 interactions, not a single message.
+- **Reputation update:** Map the six-value sentiment classification to the existing `update_agent_reputation(agent_id, sentiment)` function's two-value input: `helpful` and `friendly` map to `'positive'`; `confused`, `frustrated`, and `concerned` map to `'negative'`; `neutral` maps to no reputation change (function call skipped). Then call `update_agent_reputation(agent_id, mapped_sentiment)`.
 
 **Step 7: Return Response**
 - Return `session_id`, `reply`, `agent_name`, and `sentiment` to client
@@ -807,7 +820,7 @@ All errors are themed to the world. No raw error codes or technical messages sho
 | Interaction summaries | Existing `interactions` table | Writes summary rows using same table structure and RLS policies |
 | Reputation updates | Existing `update_agent_reputation()` function | Called directly from post-processor |
 | Chat panel open trigger | `worldStore.nearbyAgent` (existing) | `InteractionPrompt.tsx` already watches this. Chat adds `worldStore.activeChat` alongside it. |
-| Phaser input pause | `playerController.ts` (existing) | Chat calls `playerController.disable()` on open, `.enable()` on close — same pattern used by other UI overlays |
+| Phaser input pause | `playerController.ts` (modified) | Add new `disable()` and `enable()` methods to `PlayerController`. `disable()` stops processing WASD input and freezes the player sprite. `enable()` resumes. These methods do not currently exist — they are new additions for Phase 3. |
 
 No existing files are deleted or rewritten. The chat service adds new files and modifies `InteractionPrompt.tsx`, `SettlementScene.ts`, and `worldStore.ts` with minimal additions.
 
@@ -923,9 +936,12 @@ WORLD STATE:
 
 AGENTS AVAILABLE THIS HEARTBEAT:
 {for each selected agent:}
-- {name} ({role}), located in {zone}
+- {name} [id: {agent_uuid}] ({role}), located in {zone}
   Mood: {beliefs.mood}
   Current concern: {beliefs.current_concern}
+
+IMPORTANT: Use the exact agent IDs shown in [id: ...] brackets when
+populating the "involved_agents" array in your response.
 
 REQUIRED CATEGORIES: {selected categories, e.g., "craft, social"}
 FORBIDDEN CATEGORIES: {recently used, e.g., "observation"}
@@ -976,6 +992,8 @@ Respond with a JSON array:
 ```
 
 The first event advances Mira and Forge's ongoing bridge project arc. The second gives Ember a solitary moment that establishes her character. Neither is generic.
+
+**UUID Resolution:** Agent UUIDs are provided to the LLM in the prompt context (in `[id: ...]` brackets next to each agent name). The LLM is instructed to use these exact IDs in the `involved_agents` array. As a safety net, the heartbeat pipeline validates returned UUIDs against the selected agent set. If the LLM returns agent names instead of UUIDs (model non-compliance), a fallback mapping step resolves names to UUIDs using the agent roster. Invalid or unrecognized IDs cause the event to be silently dropped.
 
 ### 4.3 World Pressure Calendar
 
@@ -1499,30 +1517,45 @@ class WorldEventRenderer {
 
 **Integration with `npcManager.ts`:**
 
-The NPC manager already handles placement, idle/walk state machine, walk animations, and proximity detection. The world event renderer temporarily overrides an NPC's state machine during an event:
+The NPC manager already handles placement, idle/walk state machine, walk animations, and proximity detection. The world event renderer temporarily overrides an NPC's wander state during an event.
+
+**Note:** The existing `npcManager.ts` stores NPCs in a plain array (`NpcInstance[]`) and uses a `state: WanderState` field (values: `"idle" | "walking" | "paused"`). The following modifications are required:
+
+1. Extend `WanderState` type to include `"event_controlled"`
+2. Add a `previousState` field to `NpcInstance`
+3. Add `pauseAgent` and `resumeAgent` methods that look up NPCs via `.find()` (not `.get()` — this is an array, not a Map)
 
 ```typescript
-// Added to npcManager.ts
+// Modifications to npcManager.ts
+
+// Extend WanderState type (existing: "idle" | "walking" | "paused")
+type WanderState = "idle" | "walking" | "paused" | "event_controlled";
+
+// Add to NpcInstance interface:
+//   previousState?: WanderState;
+
+// New methods on NpcManager class:
 
 pauseAgent(agentId: string): void {
-  const npc = this.npcs.get(agentId);
+  const npc = this.npcs.find(n => n.agentId === agentId);
   if (npc) {
-    npc.previousState = npc.stateMachine;
-    npc.stateMachine = 'event_controlled';
+    npc.previousState = npc.state;
+    npc.state = 'event_controlled';
     // NPC stops wandering. Event renderer takes control of movement.
   }
 }
 
 resumeAgent(agentId: string): void {
-  const npc = this.npcs.get(agentId);
+  const npc = this.npcs.find(n => n.agentId === agentId);
   if (npc) {
-    npc.stateMachine = 'idle';
+    npc.state = npc.previousState ?? 'idle';
+    npc.previousState = undefined;
     // NPC returns to normal idle/wander cycle.
   }
 }
 ```
 
-No rewrite of existing wander logic — just a pause/resume hook. The event renderer calls `pauseAgent` before playing a sequence, then `resumeAgent` when it finishes.
+No rewrite of existing wander logic — just a type extension and two new methods. The event renderer calls `pauseAgent` before playing a sequence, then `resumeAgent` when it finishes.
 
 **Speech and thought bubbles:**
 
@@ -1746,7 +1779,8 @@ addWorldEvent: (event: AgentEvent) => void;
 ```
 
 ```typescript
-// In SettlementScene.ts — E key handler (modify existing proximity logic)
+// In SettlementScene.ts — NEW E key handler (no E key handler currently exists;
+// the scene only has an M key handler for returning to the regional map)
 
 if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
   const nearby = worldStore.getState().nearbyAgent;
@@ -1757,6 +1791,11 @@ if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
 }
 
 // Watch for chat close to re-enable player
+// NOTE: This two-argument selector-based subscribe requires the
+// `subscribeWithSelector` Zustand middleware. The existing worldStore
+// must be modified to wrap the store with this middleware:
+//   import { subscribeWithSelector } from 'zustand/middleware'
+//   create<WorldState>()(subscribeWithSelector((set) => ({ ... })))
 worldStore.subscribe(
   state => state.activeChat,
   (chat) => {
@@ -1767,7 +1806,9 @@ worldStore.subscribe(
 );
 ```
 
-This follows the exact same pattern already used for `nearbyAgent` and `InteractionPrompt.tsx`. The chat panel is another React component watching a Zustand slice.
+**Note on Zustand middleware:** The existing `worldStore.ts` uses plain `create<WorldState>(...)` without the `subscribeWithSelector` middleware. Phase 3 must wrap the store creation with `subscribeWithSelector` to enable the selector-based `subscribe` pattern used above. This is a one-line change to the store initialization and does not affect any existing subscribers or React component usage.
+
+The chat panel itself (a React component) uses the standard `useStore(worldStore, selector)` hook pattern, which works without the middleware. The middleware is only needed for the imperative `subscribe` call from Phaser scene code.
 
 ---
 
@@ -1883,7 +1924,7 @@ src/
 │   ├── npcManager.ts                      MODIFIED (add pause/resume)
 │   ├── worldEventRenderer.ts              NEW
 │   ├── speechBubble.ts                    NEW
-│   ├── playerController.ts                EXISTING (no changes)
+│   ├── playerController.ts                MODIFIED (add disable/enable methods)
 │   └── scenes/
 │       └── SettlementScene.ts             MODIFIED (E key → chat, Realtime sub)
 │
@@ -1916,7 +1957,7 @@ supabase/migrations/
 └── 0011_modify_agents_beliefs.sql         NEW
 ```
 
-**Totals: ~25 new files, 4 modified files, 4 new migrations. No files deleted or rewritten.**
+**Totals: ~25 new files, 5 modified files (npcManager, SettlementScene, InteractionPrompt, worldStore, playerController), 4+ new migrations (plus seed data migrations). No files deleted or rewritten.**
 
 ### 7.3 Build Sequence
 
