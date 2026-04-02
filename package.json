@@ -17,6 +17,7 @@
     "@react-three/fiber": "^9.5.0",
     "@supabase/supabase-js": "^2.99.1",
     "@tailwindcss/node": "^4.0.7",
+    "@upstash/qstash": "^2.10.1",
     "next": "16.1.6",
     "phaser": "^3.90.0",
     "react": "19.2.3",
