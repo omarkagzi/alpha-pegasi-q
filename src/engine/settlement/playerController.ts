@@ -19,6 +19,7 @@ export class PlayerController {
   private scene: Phaser.Scene;
   private facing: "down" | "up" | "left" | "right" = "down";
   private destroyed = false;
+  private disabled = false;
 
   constructor(scene: Phaser.Scene, spawnX: number, spawnY: number) {
     this.scene = scene;
@@ -71,8 +72,31 @@ export class PlayerController {
     }
   }
 
+  /** Disable player input (freeze sprite). Used when chat panel is open. */
+  disable(): void {
+    this.disabled = true;
+    this.sprite.setVelocity(0);
+    this.sprite.anims.stop();
+    // Disable Phaser keyboard so typed keys don't trigger game handlers
+    if (this.scene.input.keyboard) {
+      this.scene.input.keyboard.enabled = false;
+    }
+  }
+
+  /** Re-enable player input. Used when chat panel closes. */
+  enable(): void {
+    this.disabled = false;
+    if (this.scene.input.keyboard) {
+      this.scene.input.keyboard.enabled = true;
+    }
+  }
+
+  isDisabled(): boolean {
+    return this.disabled;
+  }
+
   update(): void {
-    if (this.destroyed || !this.sprite.body) return;
+    if (this.destroyed || this.disabled || !this.sprite.body) return;
 
     const left = this.cursors.left.isDown || this.wasd.A.isDown;
     const right = this.cursors.right.isDown || this.wasd.D.isDown;

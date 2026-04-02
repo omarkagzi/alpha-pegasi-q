@@ -16,6 +16,10 @@ const InteractionPrompt = dynamic(
   () => import("@/components/settlement/InteractionPrompt"),
   { ssr: false }
 );
+const ChatPanel = dynamic(
+  () => import("@/components/settlement/ChatPanel"),
+  { ssr: false }
+);
 
 export default function WorldLayout({
   children,
@@ -31,6 +35,7 @@ export default function WorldLayout({
         <Breadcrumb />
         <SettlementHUD />
         <InteractionPrompt />
+        <ChatPanel />
         {children}
       </div>
     </div>

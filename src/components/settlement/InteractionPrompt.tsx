@@ -10,8 +10,10 @@ import { useWorldStore } from "@/stores/worldStore";
 export default function InteractionPrompt() {
   const activeView = useWorldStore((s) => s.activeView);
   const nearbyAgent = useWorldStore((s) => s.nearbyAgent);
+  const activeChat = useWorldStore((s) => s.activeChat);
 
-  if (activeView !== "settlement" || !nearbyAgent) return null;
+  // Hide when not in settlement, no agent nearby, or chat is already open
+  if (activeView !== "settlement" || !nearbyAgent || activeChat) return null;
 
   return (
     <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-fade-in">

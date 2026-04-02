@@ -22,6 +22,7 @@ export class SettlementScene extends Phaser.Scene {
   private lightingEngine!: LightingEngine;
   private weatherEffects!: WeatherEffects;
   private transitioning = false;
+  private _chatUnsub?: () => void;
   private lastAppliedSeason = "";
   private tintedLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 
@@ -153,10 +154,37 @@ export class SettlementScene extends Phaser.Scene {
     this.lightingEngine = new LightingEngine(this);
     this.weatherEffects = new WeatherEffects(this, weatherEngine);
 
-    // 10. M key to return to regional map
+    // 10a. E key to interact with nearby agent (open chat)
+    if (this.input.keyboard) {
+      this.input.keyboard.on("keydown-E", () => {
+        if (this.transitioning) return;
+        const store = useWorldStore.getState();
+        if (store.activeChat) return; // already in chat
+        if (!store.nearbyAgent) return; // no agent nearby
+
+        // Disable player movement and open chat
+        this.playerController.disable();
+        store.openChat(store.nearbyAgent.id, store.nearbyAgent.name);
+      });
+    }
+
+    // 10b. Listen for chat close to re-enable player
+    let wasChatOpen = false;
+    const unsubChat = useWorldStore.subscribe((state) => {
+      const isChatOpen = state.activeChat !== null;
+      if (wasChatOpen && !isChatOpen && this.playerController) {
+        this.playerController.enable();
+      }
+      wasChatOpen = isChatOpen;
+    });
+    // Store unsub for cleanup
+    this._chatUnsub = unsubChat;
+
+    // 10c. M key to return to regional map
     if (this.input.keyboard) {
       this.input.keyboard.on("keydown-M", () => {
         if (this.transitioning) return;
+        if (useWorldStore.getState().activeChat) return; // block map exit while chatting
         this.transitioning = true;
         // Stop player movement immediately
         this.playerController?.sprite?.setVelocity(0);
@@ -237,11 +265,13 @@ export class SettlementScene extends Phaser.Scene {
   }
 
   private cleanup(): void {
+    if (this._chatUnsub) this._chatUnsub();
     if (this.lightingEngine) this.lightingEngine.destroy();
     if (this.weatherEffects) this.weatherEffects.destroy();
     if (this.buildingManager) this.buildingManager.destroy();
     if (this.npcManager) this.npcManager.destroy();
     if (this.playerController) this.playerController.destroy();
     useWorldStore.getState().setNearbyAgent(null);
+    useWorldStore.getState().closeChat();
   }
 }

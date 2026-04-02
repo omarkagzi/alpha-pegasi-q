@@ -1957,7 +1957,7 @@ supabase/migrations/
 └── 0011_modify_agents_beliefs.sql         NEW
 ```
 
-**Totals: ~25 new files, 5 modified files (npcManager, SettlementScene, InteractionPrompt, worldStore, playerController), 4+ new migrations (plus seed data migrations). No files deleted or rewritten.**
+**Totals: ~25 new files, 4 modified files, 4 new migrations. No files deleted or rewritten.**
 
 ### 7.3 Build Sequence
 

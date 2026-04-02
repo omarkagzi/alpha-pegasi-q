@@ -2,6 +2,12 @@ import { create } from "zustand";
 
 export type ActiveView = "orbital" | "region-map" | "settlement";
 
+interface ChatState {
+  agentId: string;
+  agentName: string;
+  sessionId: string | null;
+}
+
 interface WorldState {
   /** Which renderer / view is currently active */
   activeView: ActiveView;
@@ -21,6 +27,9 @@ interface WorldState {
   /** Human-readable time-of-day label */
   timeOfDay: string;
 
+  /** Active chat session (null when not chatting) */
+  activeChat: ChatState | null;
+
   // Actions
   enterBiome: (biomeId: string) => void;
   enterSettlement: (settlementId: string) => void;
@@ -29,6 +38,9 @@ interface WorldState {
   setNearbyAgent: (agent: { id: string; name: string } | null) => void;
   setWeather: (weather: string, season: string) => void;
   setTimeState: (normalizedTime: number, label: string) => void;
+  openChat: (agentId: string, agentName: string) => void;
+  closeChat: () => void;
+  setChatSessionId: (sessionId: string) => void;
 }
 
 export const useWorldStore = create<WorldState>((set) => ({
@@ -40,6 +52,7 @@ export const useWorldStore = create<WorldState>((set) => ({
   weather: "clear",
   season: "autumn",
   timeOfDay: "Day",
+  activeChat: null,
 
   enterBiome: (biomeId) =>
     set({
@@ -77,4 +90,18 @@ export const useWorldStore = create<WorldState>((set) => ({
 
   setTimeState: (normalizedTime, label) =>
     set({ normalizedTime, timeOfDay: label }),
+
+  openChat: (agentId, agentName) =>
+    set({
+      activeChat: { agentId, agentName, sessionId: null },
+    }),
+
+  closeChat: () => set({ activeChat: null }),
+
+  setChatSessionId: (sessionId) =>
+    set((state) => ({
+      activeChat: state.activeChat
+        ? { ...state.activeChat, sessionId }
+        : null,
+    })),
 }));
