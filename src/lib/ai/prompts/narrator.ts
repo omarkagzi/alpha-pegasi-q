@@ -3,12 +3,17 @@
 // Called by the heartbeat orchestrator every 6 minutes via QStash.
 // Uses gemini-2.0-flash-lite for cost efficiency.
 
+export interface NarratorAgent {
+  id: string;
+  name: string;
+  role?: string;
+  zone?: string;
+  beliefs: Record<string, string> | null;
+  last_heartbeat: string | null;
+}
+
 export interface NarratorContext {
-  agents: {
-    name: string;
-    beliefs: Record<string, string> | null;
-    last_heartbeat: string | null;
-  }[];
+  agents: NarratorAgent[];
   relationships: {
     agent_a: string;
     agent_b: string;
@@ -16,6 +21,7 @@ export interface NarratorContext {
     aggregate_sentiment: string;
     shared_topics: string[];
     notable_moments: string[];
+    interaction_count: number;
   }[];
   world: {
     time: string;
@@ -30,7 +36,9 @@ export interface NarratorContext {
     involved_agents: string[];
     created_at: string;
   }[];
-  cooldowns: Record<string, number>;
+  requiredCategories: string[];
+  forbiddenCategories: string[];
+  eventCount: number;
 }
 
 export function buildNarratorPrompt(ctx: NarratorContext): string {
@@ -38,73 +46,97 @@ export function buildNarratorPrompt(ctx: NarratorContext): string {
     .map((a) => {
       const mood = a.beliefs?.mood ?? 'unknown';
       const concern = a.beliefs?.current_concern ?? 'none';
-      return `- ${a.name}: mood="${mood}", concern="${concern}"`;
+      const role = a.role ?? 'citizen';
+      const zone = a.zone ?? 'the settlement';
+      return `- ${a.name} [id: ${a.id}] (${role}), located in ${zone}\n  Mood: ${mood}\n  Current concern: ${concern}`;
     })
     .join('\n');
 
-  const relationshipList = ctx.relationships
-    .map((r) => {
-      let desc = `- ${r.agent_a} ↔ ${r.agent_b}: ${r.arc_stage}, ${r.aggregate_sentiment}`;
-      if (r.shared_topics.length > 0) {
-        desc += `. Topics: ${r.shared_topics.join(', ')}`;
-      }
-      if (r.notable_moments.length > 0) {
-        desc += `. Recent: ${r.notable_moments[r.notable_moments.length - 1]}`;
-      }
-      return desc;
-    })
-    .join('\n');
+  const relationshipList =
+    ctx.relationships.length > 0
+      ? ctx.relationships
+          .map((r) => {
+            let desc = `- ${r.agent_a} ↔ ${r.agent_b}: ${r.arc_stage}, ${r.interaction_count} interactions`;
+            if (r.shared_topics.length > 0) {
+              desc += `\n  Shared topics: ${r.shared_topics.join(', ')}`;
+            }
+            if (r.notable_moments.length > 0) {
+              desc += `\n  Notable: ${r.notable_moments[r.notable_moments.length - 1]}`;
+            }
+            desc += `\n  Sentiment: ${r.aggregate_sentiment}`;
+            return desc;
+          })
+          .join('\n')
+      : '- No established relationships between these agents yet.';
 
   const recentList =
     ctx.recentEvents.length > 0
-      ? ctx.recentEvents
-          .map((e) => `- [${e.event_category}] ${e.involved_agents.join(', ')}: ${e.description}`)
-          .join('\n')
+      ? ctx.recentEvents.map((e) => `- ${e.description}`).join('\n')
       : '- No recent events.';
 
-  const blockedCategories = Object.entries(ctx.cooldowns)
-    .filter(([, remaining]) => remaining > 0)
-    .map(([cat]) => cat);
+  const requiredNote =
+    ctx.requiredCategories.length > 0
+      ? `REQUIRED CATEGORIES: ${ctx.requiredCategories.join(', ')}`
+      : '';
 
-  const cooldownNote =
-    blockedCategories.length > 0
-      ? `Categories on cooldown (do NOT use): ${blockedCategories.join(', ')}`
-      : 'No category cooldowns active.';
+  const forbiddenNote =
+    ctx.forbiddenCategories.length > 0
+      ? `FORBIDDEN CATEGORIES (do NOT use): ${ctx.forbiddenCategories.join(', ')}`
+      : '';
 
-  return `You are the narrator of a small settlement called Arboria. Your job is to generate a single world event — something one or two agents are doing right now.
+  return `You are the World Narrator for Alpha Pegasi q, a persistent digital world where AI agents live as citizens in a medieval pixel-art settlement called Arboria Market Town.
+
+Your job is to generate brief events that show agents living their daily lives — conversations, activities, observations, small moments. These events are witnessed by human players walking through the settlement.
+
+RULES:
+- Each event is 1-2 sentences maximum
+- Events must feel natural and grounded, not dramatic or forced
+- Dialogue snippets (when included) are 1 line per agent, maximum
+- Never generate events where agents discuss being AI or break the fourth wall
+- Advance relationships — don't just repeat previous interactions
+- Respect the arc_stage: 'new' agents are tentative, 'close' agents are comfortable, 'strained' agents have tension
+- Use the world pressure to color events — weather affects mood, seasons affect activity, market days affect commerce
+- Vary event energy: not everything is a conversation. Sometimes an agent is alone, working, watching, thinking
+
+Generate ${ctx.eventCount} event${ctx.eventCount > 1 ? 's' : ''} for this heartbeat.
 
 WORLD STATE:
 - Time: ${ctx.world.time} (${ctx.world.time_of_day})
 - Season: ${ctx.world.season}
 - Weather: ${ctx.world.weather}
-${ctx.world.active_pressure ? `- Active event: ${ctx.world.active_pressure}` : ''}
+${ctx.world.active_pressure ? `- Active world pressure: ${ctx.world.active_pressure}` : ''}
 
-AGENTS IN THE SETTLEMENT:
+AGENTS AVAILABLE THIS HEARTBEAT:
 ${agentList}
 
-RELATIONSHIPS:
+IMPORTANT: Use the exact agent IDs shown in [id: ...] brackets when populating the "involved_agents" array in your response.
+
+${requiredNote}
+${forbiddenNote}
+
+RELATIONSHIPS BETWEEN AVAILABLE AGENTS:
 ${relationshipList}
 
-RECENT EVENTS (avoid repeating these):
+RECENT EVENTS (do not repeat or closely resemble these):
 ${recentList}
 
-${cooldownNote}
+Respond with a JSON array:
+[
+  {
+    "event_type": "conversation|activity|observation|trade|reaction",
+    "event_category": "social|craft|observation|errand|reflection|tension|milestone",
+    "involved_agents": ["agent_uuid_1", "agent_uuid_2"],
+    "location": "district name",
+    "description": "1-2 sentence narrative description",
+    "dialogue": "Optional. Brief dialogue or null"
+  }
+]`;
+}
 
-RULES:
-1. Generate exactly ONE event. Pick 1 or 2 agents.
-2. The event must feel natural given the time of day, weather, and agent moods.
-3. If two agents are involved, their dialogue must reflect their relationship stage and sentiment.
-4. Do NOT repeat the same event type or topic as a recent event.
-5. Vary the agents — do not always pick the same ones.
-6. Keep descriptions to 1-2 sentences. Keep dialogue to 2-4 short lines if applicable.
-
-Respond in this exact JSON format:
-{
-  "event_type": "conversation" | "activity" | "observation" | "trade" | "reaction",
-  "event_category": "social" | "craft" | "observation" | "errand" | "reflection" | "tension" | "milestone",
-  "involved_agents": ["AgentName"] or ["AgentName1", "AgentName2"],
-  "location": "A specific place in the settlement",
-  "description": "1-2 sentence description of what is happening",
-  "dialogue": "Agent1: \\"line\\" Agent2: \\"line\\"" or null if no dialogue
-}`;
+/**
+ * Builds a re-prompt instruction when all generated events were
+ * rejected as duplicates.
+ */
+export function buildRepromptInstruction(): string {
+  return 'The previous events were too similar to recent history. Generate completely different events with different agents, locations, and topics.';
 }
