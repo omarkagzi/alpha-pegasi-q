@@ -36,7 +36,10 @@ export async function assembleAgentContext(
   clerkId: string
 ): Promise<AgentContextResult> {
   // Run all queries in parallel
-  const [agentResult, relationshipResult, interactionsResult, eventsResult, worldResult] =
+  const [
+    agentResult, relationshipResult, interactionsResult, eventsResult, worldResult,
+    agentRelsAResult, agentRelsBResult,
+  ] =
     await Promise.all([
       // 1. Agent record
       supabase
@@ -80,6 +83,26 @@ export async function assembleAgentContext(
         .select('current_time, time_of_day, season, weather, active_pressure')
         .eq('biome', 'arboria_market_town')
         .single(),
+
+      // 6. Agent-to-agent relationships (this agent as entity_a)
+      supabase
+        .from('relationships')
+        .select(
+          'entity_b_id, interaction_count, aggregate_sentiment, shared_topics, notable_moments, arc_stage'
+        )
+        .eq('entity_a_id', agentId)
+        .eq('entity_a_type', 'agent')
+        .eq('entity_b_type', 'agent'),
+
+      // 7. Agent-to-agent relationships (this agent as entity_b)
+      supabase
+        .from('relationships')
+        .select(
+          'entity_a_id, interaction_count, aggregate_sentiment, shared_topics, notable_moments, arc_stage'
+        )
+        .eq('entity_b_id', agentId)
+        .eq('entity_b_type', 'agent')
+        .eq('entity_a_type', 'agent'),
     ]);
 
   if (agentResult.error || !agentResult.data) {
@@ -106,7 +129,7 @@ export async function assembleAgentContext(
       }
     : { time: '12:00', time_of_day: 'day', season: 'autumn', weather: 'clear' };
 
-  // Build relationships array
+  // Build relationships array — user-to-agent first, then agent-to-agent
   const relationships: RelationshipRecord[] = [];
   if (relationshipResult.data) {
     relationships.push({
@@ -118,6 +141,50 @@ export async function assembleAgentContext(
       notable_moments: relationshipResult.data.notable_moments ?? [],
       arc_stage: relationshipResult.data.arc_stage ?? 'new',
     });
+  }
+
+  // Resolve agent-to-agent relationship partner names
+  const agentRelsA = agentRelsAResult.data ?? [];
+  const agentRelsB = agentRelsBResult.data ?? [];
+  const partnerIds = [
+    ...agentRelsA.map((r: Record<string, unknown>) => r.entity_b_id as string),
+    ...agentRelsB.map((r: Record<string, unknown>) => r.entity_a_id as string),
+  ];
+
+  if (partnerIds.length > 0) {
+    const { data: partnerAgents } = await supabase
+      .from('agents')
+      .select('id, name')
+      .in('id', partnerIds);
+
+    const idToName = new Map(
+      (partnerAgents ?? []).map((a: { id: string; name: string }) => [a.id, a.name])
+    );
+
+    for (const r of agentRelsA) {
+      const row = r as Record<string, unknown>;
+      relationships.push({
+        entity_name: idToName.get(row.entity_b_id as string) ?? 'Unknown',
+        entity_type: 'agent',
+        interaction_count: (row.interaction_count as number) ?? 0,
+        aggregate_sentiment: (row.aggregate_sentiment as string) ?? 'neutral',
+        shared_topics: (row.shared_topics as string[]) ?? [],
+        notable_moments: (row.notable_moments as string[]) ?? [],
+        arc_stage: (row.arc_stage as string) ?? 'new',
+      });
+    }
+    for (const r of agentRelsB) {
+      const row = r as Record<string, unknown>;
+      relationships.push({
+        entity_name: idToName.get(row.entity_a_id as string) ?? 'Unknown',
+        entity_type: 'agent',
+        interaction_count: (row.interaction_count as number) ?? 0,
+        aggregate_sentiment: (row.aggregate_sentiment as string) ?? 'neutral',
+        shared_topics: (row.shared_topics as string[]) ?? [],
+        notable_moments: (row.notable_moments as string[]) ?? [],
+        arc_stage: (row.arc_stage as string) ?? 'new',
+      });
+    }
   }
 
   // Build recent events
