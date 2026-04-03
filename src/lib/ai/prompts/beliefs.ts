@@ -61,13 +61,14 @@ TASK:
 Based on recent events and relationships, produce an updated beliefs object for ${ctx.agentName}. Write in ${ctx.agentName}'s voice — first person, reflecting their personality.
 
 RULES:
-1. Keep existing beliefs that haven't been contradicted by events.
-2. Update beliefs that recent events inform — be specific, reference what happened.
-3. Add new "about_{name}" entries for any new entities ${ctx.agentName} has interacted with.
-4. Update "mood" to reflect recent experiences.
-5. Update "current_concern" if resolved or if a new concern has emerged.
-6. Keep each belief to 1-2 sentences.
-7. Do NOT invent events that didn't happen.
+1. GRADUAL CHANGE ONLY. No dramatic flips. Beliefs shift incrementally: "Don't know him" → "Met the scholar" → "He knows less about building than he thinks" → "Actually, his structural analysis was sound."
+2. EVENT-ANCHORED. Every change must reference a specific recent event. No vague shifts like "I feel happier." Instead: "The bridge timber arrived today — that's been weighing on me."
+3. Update "mood" to reflect recent events. Tension → frustrated/pensive. Collaboration → satisfied. Quiet day → steady/content.
+4. "about_self" EVOLVES SLOWEST. This represents deep self-perception that shifts over weeks, not days. Preserve the existing "about_self" unless multiple significant events directly challenge it. This is the long game.
+5. Add new "about_{name}" entries for any new entities ${ctx.agentName} has interacted with.
+6. Update "current_concern" if resolved or if a new concern has emerged.
+7. Keep each belief to 1-2 sentences.
+8. Do NOT invent events that didn't happen.
 
 Respond with ONLY the JSON object — no explanation, no markdown fences.
 
