@@ -234,6 +234,14 @@ async function runBeliefUpdate(
         .update({ beliefs: updatedBeliefs })
         .eq('id', agent.id);
 
+      // Broadcast belief update to connected clients
+      const beliefChannel = supabase.channel('world-events:arboria_market_town');
+      await beliefChannel.send({
+        type: 'broadcast',
+        event: 'belief-update',
+        payload: { agentId: agent.id, agentName: agent.name, beliefs: updatedBeliefs },
+      });
+
       console.log(`[Heartbeat] Updated beliefs for ${agent.name}`);
     } catch (err) {
       console.error(`[Heartbeat] Belief update failed for ${agent.name}:`, err);
@@ -468,6 +476,18 @@ export async function POST(request: NextRequest) {
       event: 'heartbeat',
       payload: { events: storedEvents },
     });
+
+    // Broadcast relationship updates — collect all agent pairs that were updated
+    const updatedPairs = storedEvents
+      .filter((e) => Array.isArray(e.involved_agents) && (e.involved_agents as string[]).length >= 2)
+      .map((e) => e.involved_agents as string[]);
+    if (updatedPairs.length > 0) {
+      await channel.send({
+        type: 'broadcast',
+        event: 'relationships-updated',
+        payload: { pairs: updatedPairs },
+      });
+    }
 
     // ── Step 10: Belief update (every 4th heartbeat) ──
     if (timeInfo.heartbeat_count % 4 === 0) {
