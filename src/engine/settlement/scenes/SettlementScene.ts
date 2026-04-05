@@ -2,7 +2,8 @@ import Phaser from "phaser";
 import { PlayerController } from "../playerController";
 import { NpcManager } from "../npcManager";
 import { BuildingManager } from "../buildingManager";
-import { useWorldStore } from "@/stores/worldStore";
+import { WorldEventRenderer } from "../worldEventRenderer";
+import { useWorldStore, type WorldEvent } from "@/stores/worldStore";
 import { WeatherEngine } from "@/engine/region/weatherEngine";
 import { LightingEngine } from "@/engine/region/lightingEngine";
 import { WeatherEffects } from "../weatherEffects";
@@ -19,10 +20,12 @@ export class SettlementScene extends Phaser.Scene {
   private playerController!: PlayerController;
   private npcManager!: NpcManager;
   private buildingManager!: BuildingManager;
+  private worldEventRenderer!: WorldEventRenderer;
   private lightingEngine!: LightingEngine;
   private weatherEffects!: WeatherEffects;
   private transitioning = false;
   private _chatUnsub?: () => void;
+  private _realtimeChannel?: ReturnType<typeof supabaseAnon.channel>;
   private lastAppliedSeason = "";
   private tintedLayers: Phaser.Tilemaps.TilemapLayer[] = [];
 
@@ -124,7 +127,13 @@ export class SettlementScene extends Phaser.Scene {
       }
     }
 
+    // 9a-2. World event renderer — plays heartbeat events as visual sequences
+    this.worldEventRenderer = new WorldEventRenderer(this, this.npcManager);
+
     this.fetchAndEnrichAgents();
+
+    // 9a-3. Subscribe to Supabase Realtime for world events
+    this.subscribeToWorldEvents();
 
     // 9. Set camera bounds to map dimensions
     const mapWidth = map.widthInPixels;
@@ -218,6 +227,9 @@ export class SettlementScene extends Phaser.Scene {
     if (this.npcManager && this.playerController) {
       this.npcManager.update(this.playerController.sprite);
     }
+    if (this.worldEventRenderer) {
+      this.worldEventRenderer.update();
+    }
     if (this.lightingEngine) {
       this.lightingEngine.update();
     }
@@ -264,8 +276,35 @@ export class SettlementScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Subscribe to Supabase Realtime channel for world heartbeat events.
+   * Events are enqueued into the WorldEventRenderer and added to the store
+   * for the Activity Feed.
+   */
+  private subscribeToWorldEvents(): void {
+    const settlement = useWorldStore.getState().currentSettlement || "arboria_market_town";
+    this._realtimeChannel = supabaseAnon.channel(`world-events:${settlement}`);
+
+    this._realtimeChannel
+      .on("broadcast", { event: "heartbeat" }, (payload) => {
+        const events = payload.payload?.events as WorldEvent[] | undefined;
+        if (!events || events.length === 0) return;
+
+        // Feed into Phaser event renderer
+        this.worldEventRenderer.enqueue(events);
+
+        // Feed into Zustand store for React Activity Feed
+        useWorldStore.getState().addWorldEvents(events);
+      })
+      .subscribe();
+  }
+
   private cleanup(): void {
     if (this._chatUnsub) this._chatUnsub();
+    if (this._realtimeChannel) {
+      supabaseAnon.removeChannel(this._realtimeChannel);
+    }
+    if (this.worldEventRenderer) this.worldEventRenderer.destroy();
     if (this.lightingEngine) this.lightingEngine.destroy();
     if (this.weatherEffects) this.weatherEffects.destroy();
     if (this.buildingManager) this.buildingManager.destroy();
