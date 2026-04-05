@@ -1,19 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useWorldStore } from "@/stores/worldStore";
 import { useAuth } from "@clerk/nextjs";
-import { ChatInput } from "./ChatInput";
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-  attachment?: {
-    filename: string;
-    type: string;
-  };
-}
+import { ChatHeader } from "./chat/ChatHeader";
+import { ChatMessages, type ChatMessage } from "./chat/ChatMessages";
+import { ChatInput } from "./chat/ChatInput";
 
 /**
  * ChatPanel — side panel for human-to-agent conversation.
@@ -29,8 +21,6 @@ export default function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
 
   // Reset messages when chat opens with a different agent
   useEffect(() => {
@@ -40,11 +30,6 @@ export default function ChatPanel() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally reset only on agentId change
   }, [activeChat?.agentId]);
-
-  // Auto-scroll to bottom on new messages
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
 
   // End session on the server when chat closes
   const handleCloseChat = useCallback(async () => {
@@ -149,82 +134,23 @@ export default function ChatPanel() {
   if (!activeChat) return null;
 
   return (
-    <div
-      ref={panelRef}
-      className="absolute top-0 right-0 h-full w-[380px] z-40 flex flex-col bg-black/85 border-l border-amber-700/40 backdrop-blur-sm animate-slide-in-right pointer-events-auto"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-amber-700/30">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-mono text-amber-400 font-bold text-sm">
-            {activeChat.agentName}
-          </span>
-        </div>
-        <button
-          onClick={handleCloseChat}
-          className="text-gray-500 hover:text-gray-300 font-mono text-xs px-2 py-1 border border-gray-700 rounded hover:border-gray-500 transition-colors"
-          title="Close (ESC)"
-        >
-          ESC
-        </button>
-      </div>
+    <div className="absolute top-0 right-0 h-full w-[380px] z-40 flex flex-col bg-black/85 border-l border-amber-700/40 backdrop-blur-sm animate-slide-in-right pointer-events-auto">
+      {/* Header with agent name, journal button, and close */}
+      <ChatHeader
+        agentId={activeChat.agentId}
+        agentName={activeChat.agentName}
+        onClose={handleCloseChat}
+      />
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 scrollbar-thin">
-        {messages.length === 0 && !isLoading && (
-          <div className="text-gray-600 text-xs font-mono text-center mt-8">
-            Start a conversation with {activeChat.agentName}
-          </div>
-        )}
+      {/* Scrollable message list */}
+      <ChatMessages
+        messages={messages}
+        agentName={activeChat.agentName}
+        isLoading={isLoading}
+        error={error}
+      />
 
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
-            <div
-              className={`max-w-[85%] rounded-lg px-3 py-2 font-mono text-xs leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-amber-900/40 border border-amber-700/30 text-gray-200"
-                  : "bg-gray-800/60 border border-gray-700/40 text-gray-300"
-              }`}
-            >
-              {msg.attachment && (
-                <div className="text-[10px] text-amber-500/70 mb-1 flex items-center gap-1">
-                  <span>📎</span>
-                  <span>{msg.attachment.filename}</span>
-                </div>
-              )}
-              <div className="whitespace-pre-wrap break-words">{msg.content}</div>
-            </div>
-          </div>
-        ))}
-
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-gray-800/60 border border-gray-700/40 rounded-lg px-3 py-2">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-amber-500/60 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 bg-amber-500/60 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-1.5 h-1.5 bg-amber-500/60 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="text-center">
-            <span className="text-red-400/80 text-xs font-mono bg-red-900/20 border border-red-800/30 rounded px-2 py-1">
-              {error}
-            </span>
-          </div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
+      {/* Input with file attachment */}
       <ChatInput onSend={sendMessage} disabled={isLoading} />
     </div>
   );
