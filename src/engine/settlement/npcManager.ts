@@ -13,7 +13,7 @@ const TILE_SIZE = 16;
 const MAP_TILES = 58; // map is 58x58
 
 // ── Types ─────────────────────────────────────────────────────────
-type WanderState = "idle" | "walking" | "paused";
+type WanderState = "idle" | "walking" | "paused" | "event_controlled";
 
 interface NpcData {
   name: string;
@@ -33,6 +33,7 @@ interface NpcInstance {
   zone: Phaser.GameObjects.Zone;
   // Wander state
   state: WanderState;
+  previousState?: WanderState;
   idleTimer: Phaser.Time.TimerEvent | null;
   walkTimer: Phaser.Time.TimerEvent | null;
   targetX: number;
@@ -351,6 +352,9 @@ export class NpcManager {
       npc.zone.setPosition(npc.sprite.x, npc.sprite.y);
       (npc.zone.body as Phaser.Physics.Arcade.StaticBody).updateFromGameObject();
 
+      // Skip NPCs under event renderer control
+      if (npc.state === "event_controlled") continue;
+
       // Check if player is still in zone
       const zoneBody = npc.zone.body as Phaser.Physics.Arcade.StaticBody;
       const playerBody = playerSprite.body;
@@ -406,6 +410,48 @@ export class NpcManager {
         useWorldStore.getState().setNearbyAgent(null);
       }
     }
+  }
+
+  // ── Event Control API ──────────────────────────────────────────
+  // Used by WorldEventRenderer to take temporary control of NPCs.
+
+  /**
+   * Pause an NPC's autonomous wandering so the event renderer can control it.
+   * Returns the NPC sprite, or null if not found.
+   */
+  pauseAgent(agentId: string): Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null {
+    const npc = this.npcs.find(n => n.data.agentId === agentId || n.data.dbId === agentId);
+    if (!npc) return null;
+    npc.previousState = npc.state;
+    npc.state = "event_controlled";
+    npc.sprite.setVelocity(0, 0);
+    npc.idleTimer?.destroy();
+    npc.idleTimer = null;
+    npc.walkTimer?.destroy();
+    npc.walkTimer = null;
+    this.playIdleAnim(npc);
+    return npc.sprite;
+  }
+
+  /**
+   * Release an NPC back to autonomous wandering after an event sequence.
+   */
+  resumeAgent(agentId: string): void {
+    const npc = this.npcs.find(n => n.data.agentId === agentId || n.data.dbId === agentId);
+    if (!npc) return;
+    npc.state = npc.previousState ?? "idle";
+    npc.previousState = undefined;
+    if (npc.state === "idle" || npc.state === "paused") {
+      this.startIdle(npc);
+    }
+  }
+
+  /**
+   * Get an NPC sprite by agent ID (for positioning during event sequences).
+   */
+  getNpcSprite(agentId: string): Phaser.Types.Physics.Arcade.SpriteWithDynamicBody | null {
+    const npc = this.npcs.find(n => n.data.agentId === agentId || n.data.dbId === agentId);
+    return npc?.sprite ?? null;
   }
 
   destroy(): void {
