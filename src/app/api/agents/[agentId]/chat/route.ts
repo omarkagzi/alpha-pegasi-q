@@ -61,18 +61,29 @@ export async function POST(
     );
   }
 
-  // Look up user record
-  const { data: user, error: userError } = await supabase
+  // Look up user record — auto-provision if Clerk user has no Supabase row yet
+  let { data: user } = await supabase
     .from('users')
     .select('id, tier')
     .eq('clerk_id', clerkId)
     .single();
 
-  if (userError || !user) {
-    return NextResponse.json(
-      { error: ERRORS.visitor_tier },
-      { status: 403 }
-    );
+  if (!user) {
+    // First interaction: create the user record with 'explorer' tier
+    const { data: newUser, error: insertErr } = await supabase
+      .from('users')
+      .insert({ clerk_id: clerkId, tier: 'explorer' })
+      .select('id, tier')
+      .single();
+
+    if (insertErr || !newUser) {
+      console.error('[Chat] Failed to auto-provision user:', insertErr?.message);
+      return NextResponse.json(
+        { error: ERRORS.server_error },
+        { status: 500 }
+      );
+    }
+    user = newUser;
   }
 
   // Check tier — visitors cannot chat
