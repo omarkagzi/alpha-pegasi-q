@@ -54,6 +54,6 @@ export class BootScene extends Phaser.Scene {
 
     this.game.registry.set("bootComplete", true);
     this.game.events.emit("bootComplete");
-    this.scene.start("RegionMapScene");
+    this.scene.start("SettlementScene");
   }
 }
