@@ -72,12 +72,40 @@ export class SettlementScene extends Phaser.Scene {
     treeLayer?.setDepth(5);
     wheatLayer?.setDepth(6);
 
-    // 4. Collision — wall, building, and tree tiles block the player
-    // Water does NOT collide — bridges are placed over water tiles,
-    // and blanket water collision would block bridge crossings.
+    // 4. Collision — wall, building, tree, and water tiles block the player
     wallLayer?.setCollisionByExclusion([-1, 0]);
     buildingsLayer?.setCollisionByExclusion([-1, 0]);
     treeLayer?.setCollisionByExclusion([-1, 0]);
+    waterLayer?.setCollisionByExclusion([-1, 0]);
+
+    // 4a. Bridge/gate tiles on the wall layer should be walkable.
+    // These tile IDs form the gate/bridge structures in the MinyWorld tileset.
+    const BRIDGE_TILE_IDS = [
+      890,
+      1032, 1033, 1034, 1035, 1036,
+      1103, 1104, 1105, 1106, 1107,
+      1174, 1175, 1176, 1177, 1178,
+    ];
+    if (wallLayer) {
+      for (const tileId of BRIDGE_TILE_IDS) {
+        wallLayer.setCollision(tileId, false);
+      }
+    }
+
+    // 4b. Remove water collision under bridge positions (where bridge wall tiles exist)
+    if (waterLayer && wallLayer) {
+      for (let ty = 0; ty < map.height; ty++) {
+        for (let tx = 0; tx < map.width; tx++) {
+          const wallTile = wallLayer.getTileAt(tx, ty);
+          if (wallTile && BRIDGE_TILE_IDS.includes(wallTile.index)) {
+            const waterTile = waterLayer.getTileAt(tx, ty);
+            if (waterTile) {
+              waterTile.setCollision(false, false, false, false);
+            }
+          }
+        }
+      }
+    }
 
     // 5. Get object layer
     const objectLayer = map.getObjectLayer("interactions");
@@ -102,8 +130,8 @@ export class SettlementScene extends Phaser.Scene {
     // 7. Create player
     this.playerController = new PlayerController(this, spawnX, spawnY);
 
-    // 8. Collisions — player vs wall/building/tree tile layers + building sprites
-    const collisionLayers = [wallLayer, buildingsLayer, treeLayer].filter(
+    // 8. Collisions — player vs wall/building/tree/water tile layers + building sprites
+    const collisionLayers = [wallLayer, buildingsLayer, treeLayer, waterLayer].filter(
       (l): l is Phaser.Tilemaps.TilemapLayer => l !== null
     );
     for (const layer of collisionLayers) {
@@ -135,10 +163,11 @@ export class SettlementScene extends Phaser.Scene {
     // 9a-3. Subscribe to Supabase Realtime for world events
     this.subscribeToWorldEvents();
 
-    // 9. Set camera bounds to map dimensions
+    // 9. Set camera and physics world bounds to map dimensions
     const mapWidth = map.widthInPixels;
     const mapHeight = map.heightInPixels;
     this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
+    this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
 
     // 9b. Weather & lighting engines
     let weatherEngine = this.game.registry.get(
