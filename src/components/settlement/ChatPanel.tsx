@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useWorldStore } from "@/stores/worldStore";
-import { useAuth } from "@clerk/nextjs";
+import { useAuth, SignInButton } from "@clerk/nextjs";
 import { ChatHeader } from "./chat/ChatHeader";
 import { ChatMessages, type ChatMessage } from "./chat/ChatMessages";
 import { ChatInput } from "./chat/ChatInput";
@@ -16,7 +16,7 @@ export default function ChatPanel() {
   const activeChat = useWorldStore((s) => s.activeChat);
   const closeChat = useWorldStore((s) => s.closeChat);
   const setChatSessionId = useWorldStore((s) => s.setChatSessionId);
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -150,8 +150,19 @@ export default function ChatPanel() {
         error={error}
       />
 
-      {/* Input with file attachment */}
-      <ChatInput onSend={sendMessage} disabled={isLoading} />
+      {/* Input with file attachment, or sign-in prompt */}
+      {isSignedIn === false ? (
+        <div className="px-4 py-3 border-t border-amber-700/40 text-center">
+          <p className="text-gray-400 text-xs font-mono mb-2">Sign in to speak with the people of Arboria.</p>
+          <SignInButton mode="modal">
+            <button className="px-4 py-1.5 rounded bg-amber-700/60 hover:bg-amber-700/80 text-amber-100 text-xs font-mono border border-amber-600/40 cursor-pointer transition-colors">
+              Sign In
+            </button>
+          </SignInButton>
+        </div>
+      ) : (
+        <ChatInput onSend={sendMessage} disabled={isLoading} />
+      )}
     </div>
   );
 }
