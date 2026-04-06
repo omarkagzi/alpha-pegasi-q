@@ -76,9 +76,9 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
 
   enterBiome: (biomeId) =>
     set({
-      activeView: "region-map",
+      activeView: "settlement",
       currentBiome: biomeId,
-      currentSettlement: null,
+      currentSettlement: "arboria_market_town",
       nearbyAgent: null,
     }),
 
