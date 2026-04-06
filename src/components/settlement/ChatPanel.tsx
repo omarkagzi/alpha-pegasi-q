@@ -16,7 +16,7 @@ export default function ChatPanel() {
   const activeChat = useWorldStore((s) => s.activeChat);
   const closeChat = useWorldStore((s) => s.closeChat);
   const setChatSessionId = useWorldStore((s) => s.setChatSessionId);
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn, isLoaded } = useAuth();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -151,7 +151,7 @@ export default function ChatPanel() {
       />
 
       {/* Input with file attachment, or sign-in prompt */}
-      {isSignedIn === false ? (
+      {isLoaded && !isSignedIn ? (
         <div className="px-4 py-3 border-t border-amber-700/40 text-center">
           <p className="text-gray-400 text-xs font-mono mb-2">Sign in to speak with the people of Arboria.</p>
           <SignInButton mode="modal">

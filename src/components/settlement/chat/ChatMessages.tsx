@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect } from "react";
+import { SignInButton } from "@clerk/nextjs";
 import { AgentTyping } from "./AgentTyping";
 
 export interface ChatMessage {
@@ -65,10 +66,19 @@ export function ChatMessages({ messages, agentName, isLoading, error }: ChatMess
       {isLoading && <AgentTyping />}
 
       {error && (
-        <div className="text-center">
+        <div className="text-center space-y-2">
           <span className="text-red-400/80 text-xs font-mono bg-red-900/20 border border-red-800/30 rounded px-2 py-1">
             {error}
           </span>
+          {error.toLowerCase().includes("sign in") && (
+            <div>
+              <SignInButton mode="modal">
+                <button className="px-4 py-1.5 rounded bg-amber-700/60 hover:bg-amber-700/80 text-amber-100 text-xs font-mono border border-amber-600/40 cursor-pointer transition-colors">
+                  Sign In
+                </button>
+              </SignInButton>
+            </div>
+          )}
         </div>
       )}
 
