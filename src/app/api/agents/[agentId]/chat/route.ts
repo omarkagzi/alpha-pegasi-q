@@ -70,8 +70,8 @@ export async function POST(
 
   if (userError || !user) {
     return NextResponse.json(
-      { error: ERRORS.unauthenticated },
-      { status: 401 }
+      { error: ERRORS.visitor_tier },
+      { status: 403 }
     );
   }
 
