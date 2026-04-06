@@ -75,6 +75,14 @@ export default function WorldCanvas() {
     if (goingToPhaser && !wasInPhaser) {
       // Orbital → Phaser: resume Phaser, fade to it
       phaserRef.current?.resume();
+      // Ensure the correct Phaser scene is active based on activeView
+      const game = phaserRef.current?.getGame();
+      if (game && activeView === "settlement") {
+        const settlement = game.scene.getScene("SettlementScene");
+        if (settlement && !settlement.scene.isActive()) {
+          game.scene.start("SettlementScene");
+        }
+      }
       fadeTo("phaser");
     } else if (!goingToPhaser && wasInPhaser) {
       // Phaser → Orbital: fade to Three.js, then pause Phaser
