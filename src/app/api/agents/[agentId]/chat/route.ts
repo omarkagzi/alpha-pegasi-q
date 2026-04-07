@@ -10,7 +10,7 @@ import { createProvider, type ChatMessage } from '@/lib/ai/provider';
 import { runPostProcessing } from '@/lib/chat/postProcessor';
 
 const MAX_CONVERSATION_HISTORY = 30;
-const LLM_TIMEOUT_MS = 10_000;
+const LLM_TIMEOUT_MS = 30_000;
 
 /** Returns the correct API key for the given provider. */
 function getApiKey(provider: string): string {
@@ -290,28 +290,12 @@ export async function POST(
       );
     }
 
-    if (message.includes('429') || message.includes('rate')) {
-      // Retry once after 2s backoff
-      try {
-        await new Promise((r) => setTimeout(r, 2000));
-        const provider = createProvider(providerType, apiKey);
-        const retryResult = await provider.chat(llmMessages, {
-          model: contextResult.agent.model_id,
-        });
-        reply = retryResult.content;
-      } catch {
-        return NextResponse.json(
-          { error: ERRORS.rate_limit },
-          { status: 503 }
-        );
-      }
-    } else {
-      console.error('[Chat] LLM error:', message);
-      return NextResponse.json(
-        { error: ERRORS.server_error },
-        { status: 503 }
-      );
-    }
+    // Surface actual error for debugging, then return appropriate status
+    console.error('[Chat] LLM error detail:', message);
+    return NextResponse.json(
+      { error: `${ERRORS.server_error} [Debug: ${message.slice(0, 200)}]` },
+      { status: 503 }
+    );
   }
 
   // ── Step 7: Store Response ──
