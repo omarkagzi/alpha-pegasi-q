@@ -256,6 +256,13 @@ export async function POST(
 
   // ── Step 6: LLM Call ──
   const apiKey = getApiKey(contextResult.agent.provider);
+  if (!apiKey) {
+    console.error(`[Chat] Missing API key for provider: ${contextResult.agent.provider}`);
+    return NextResponse.json(
+      { error: ERRORS.server_error },
+      { status: 503 }
+    );
+  }
   const providerType = contextResult.agent.provider as 'gemini' | 'openrouter' | 'deepseek';
   let reply: string;
   try {
@@ -274,6 +281,7 @@ export async function POST(
     reply = result.content;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    console.error(`[Chat] LLM call failed (${providerType}):`, message);
 
     if (message === 'timeout') {
       return NextResponse.json(
