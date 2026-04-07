@@ -8,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase/server';
 import { createProvider, type ChatMessage } from '@/lib/ai/provider';
 import { buildJournalPrompt, type JournalContext } from '@/lib/ai/prompts/journal';
 
-const LITE_MODEL = 'gemini-2.0-flash-lite';
+const LITE_MODEL = 'llama-3.1-8b-instant';
 const LLM_TIMEOUT_MS = 10_000;
 
 // Today = last 24 real minutes (~24 game-hours at 1 min = 1 game-hour)
@@ -17,7 +17,7 @@ const TODAY_WINDOW_MS = 24 * 60 * 1000;
 const WEEK_WINDOW_MS = 7 * 24 * 60 * 1000;
 
 function getApiKey(): string {
-  return process.env.GEMINI_API_KEY ?? '';
+  return process.env.GROQ_API_KEY ?? '';
 }
 
 export async function GET(
@@ -122,7 +122,7 @@ export async function GET(
   };
 
   const prompt = buildJournalPrompt(journalCtx);
-  const llm = createProvider('gemini', getApiKey());
+  const llm = createProvider('groq', getApiKey());
 
   const messages: ChatMessage[] = [
     { role: 'user', content: prompt },

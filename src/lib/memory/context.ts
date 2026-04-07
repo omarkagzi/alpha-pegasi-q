@@ -217,8 +217,8 @@ export async function assembleAgentContext(
     agent: {
       id: agentData.id,
       name: agentData.name,
-      provider: agentData.provider ?? 'gemini',
-      model_id: agentData.model_id ?? 'gemini-2.0-flash',
+      provider: agentData.provider ?? 'groq',
+      model_id: agentData.model_id ?? 'llama-3.3-70b-versatile',
       beliefs: agentData.beliefs,
     },
   };

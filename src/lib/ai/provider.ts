@@ -29,7 +29,7 @@ export interface LLMProvider {
 
 // Lazy imports to avoid loading unused provider SDKs
 export function createProvider(
-  provider: 'gemini' | 'openrouter' | 'deepseek',
+  provider: 'gemini' | 'openrouter' | 'deepseek' | 'groq',
   apiKey: string
 ): LLMProvider {
   switch (provider) {
@@ -40,6 +40,10 @@ export function createProvider(
     case 'openrouter': {
       const { OpenRouterProvider } = require('./openrouter');
       return new OpenRouterProvider(apiKey);
+    }
+    case 'groq': {
+      const { GroqProvider } = require('./groq');
+      return new GroqProvider(apiKey);
     }
     case 'deepseek':
       throw new Error('DeepSeek provider not yet implemented');

@@ -15,6 +15,8 @@ const LLM_TIMEOUT_MS = 30_000;
 /** Returns the correct API key for the given provider. */
 function getApiKey(provider: string): string {
   switch (provider) {
+    case 'groq':
+      return process.env.GROQ_API_KEY ?? '';
     case 'openrouter':
       return process.env.OPENROUTER_API_KEY ?? '';
     case 'deepseek':
@@ -263,21 +265,22 @@ export async function POST(
       { status: 503 }
     );
   }
-  const providerType = contextResult.agent.provider as 'gemini' | 'openrouter' | 'deepseek';
+  const providerType = contextResult.agent.provider as 'gemini' | 'openrouter' | 'deepseek' | 'groq';
   let reply: string;
-  try {
-    const provider = createProvider(providerType, apiKey);
 
+  const callLLM = async () => {
+    const provider = createProvider(providerType, apiKey);
     const llmPromise = provider.chat(llmMessages, {
       model: contextResult.agent.model_id,
     });
-
-    // Timeout
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), LLM_TIMEOUT_MS)
     );
+    return Promise.race([llmPromise, timeoutPromise]);
+  };
 
-    const result = await Promise.race([llmPromise, timeoutPromise]);
+  try {
+    const result = await callLLM();
     reply = result.content;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -290,12 +293,27 @@ export async function POST(
       );
     }
 
-    // Surface actual error for debugging, then return appropriate status
-    console.error('[Chat] LLM error detail:', message);
-    return NextResponse.json(
-      { error: `${ERRORS.server_error} [Debug: ${message.slice(0, 200)}]` },
-      { status: 503 }
-    );
+    // Retry once on rate-limit (429)
+    if (message.includes('429') || message.toLowerCase().includes('rate limit')) {
+      console.warn('[Chat] Rate limited, retrying after 2s...');
+      await new Promise((r) => setTimeout(r, 2000));
+      try {
+        const retryResult = await callLLM();
+        reply = retryResult.content;
+      } catch (retryErr) {
+        console.error('[Chat] Retry also failed:', retryErr);
+        return NextResponse.json(
+          { error: ERRORS.rate_limit },
+          { status: 429 }
+        );
+      }
+    } else {
+      console.error('[Chat] LLM error detail:', message);
+      return NextResponse.json(
+        { error: ERRORS.server_error },
+        { status: 503 }
+      );
+    }
   }
 
   // ── Step 7: Store Response ──
@@ -334,7 +352,7 @@ export async function POST(
     agentId,
     userId: user.id,
     agentResponse: reply,
-    geminiApiKey: getApiKey('gemini'),
+    groqApiKey: getApiKey('groq'),
   }).catch((err) => console.error('[Chat] Post-processing error:', err));
 
   // ── Step 9: Return Response ──

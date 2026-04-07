@@ -18,8 +18,8 @@ import { updateRelationshipsFromEvent } from '@/lib/memory/relationships';
 import { buildNarratorPrompt, buildRepromptInstruction, type NarratorContext } from '@/lib/ai/prompts/narrator';
 import { buildBeliefUpdatePrompt, type BeliefUpdateContext } from '@/lib/ai/prompts/beliefs';
 
-const LITE_MODEL = 'gemini-2.0-flash-lite';
-const GEMINI_API_KEY = () => process.env.GEMINI_API_KEY ?? '';
+const LITE_MODEL = 'llama-3.1-8b-instant';
+const GROQ_API_KEY = () => process.env.GROQ_API_KEY ?? '';
 
 // Agent roles and default zones for narrator context
 const AGENT_META: Record<string, { role: string; zone: string }> = {
@@ -64,7 +64,7 @@ async function callNarrator(
   prompt: string,
   repromptHint?: string,
 ): Promise<GeneratedEvent[]> {
-  const provider = createProvider('gemini', GEMINI_API_KEY());
+  const provider = createProvider('groq', GROQ_API_KEY());
   const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
 
   if (repromptHint) {
@@ -146,7 +146,7 @@ async function runBeliefUpdate(
 
   if (!agents || agents.length === 0) return;
 
-  const provider = createProvider('gemini', GEMINI_API_KEY());
+  const provider = createProvider('groq', GROQ_API_KEY());
 
   for (const agent of agents) {
     try {

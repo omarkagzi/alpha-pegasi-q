@@ -13,7 +13,7 @@ import {
   type ChatSentiment,
 } from '@/lib/ai/prompts/sentiment';
 
-const LITE_MODEL = 'gemini-2.0-flash-lite';
+const LITE_MODEL = 'llama-3.1-8b-instant';
 
 // Arc stage progression thresholds
 const ARC_THRESHOLDS: Record<string, number> = {
@@ -32,12 +32,12 @@ export async function runPostProcessing(
     agentId: string;
     userId: string;
     agentResponse: string;
-    geminiApiKey: string;
+    groqApiKey: string;
   }
 ): Promise<void> {
   try {
     // 1. Classify sentiment via cheap LLM call
-    const sentiment = await classifySentiment(opts.agentResponse, opts.geminiApiKey);
+    const sentiment = await classifySentiment(opts.agentResponse, opts.groqApiKey);
 
     // 2. Update relationship (parallel with reputation)
     await Promise.all([
@@ -54,7 +54,7 @@ async function classifySentiment(
   apiKey: string
 ): Promise<ChatSentiment> {
   try {
-    const provider = createProvider('gemini', apiKey);
+    const provider = createProvider('groq', apiKey);
     const prompt = buildSentimentPrompt(agentResponse);
     const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
     const result = await provider.chat(messages, {
@@ -158,7 +158,7 @@ export async function endSession(
     sessionId: string;
     agentId: string;
     clerkId: string;
-    geminiApiKey: string;
+    groqApiKey: string;
   }
 ): Promise<void> {
   try {
@@ -172,7 +172,7 @@ export async function endSession(
     if (!session?.messages || session.messages.length === 0) return;
 
     // Generate summary via LLM
-    const provider = createProvider('gemini', opts.geminiApiKey);
+    const provider = createProvider('groq', opts.groqApiKey);
     const messages = session.messages as Array<{ role: string; content: string }>;
     const transcript = messages
       .map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
