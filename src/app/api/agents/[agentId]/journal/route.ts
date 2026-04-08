@@ -66,33 +66,50 @@ export async function GET(
     .limit(20);
 
   // ── Fetch relationships ──
-  const { data: relationships } = await supabase
+  const { data: relsAsA } = await supabase
     .from('relationships')
-    .select('agent_a, agent_b, label, interaction_count')
-    .or(`agent_a.eq.${agentId},agent_b.eq.${agentId}`)
+    .select('entity_b_id, arc_stage, aggregate_sentiment, interaction_count')
+    .eq('entity_a_id', agentId)
+    .order('interaction_count', { ascending: false })
+    .limit(10);
+
+  const { data: relsAsB } = await supabase
+    .from('relationships')
+    .select('entity_a_id, arc_stage, aggregate_sentiment, interaction_count')
+    .eq('entity_b_id', agentId)
     .order('interaction_count', { ascending: false })
     .limit(10);
 
   // Resolve relationship agent names
   let relationshipEntries: { name: string; label: string; count: number }[] = [];
-  if (relationships && relationships.length > 0) {
-    const otherIds = relationships.map((r) =>
-      r.agent_a === agentId ? r.agent_b : r.agent_a
-    );
+  const allRels = [
+    ...(relsAsA ?? []).map((r) => ({ otherId: r.entity_b_id, arc_stage: r.arc_stage, sentiment: r.aggregate_sentiment, count: r.interaction_count })),
+    ...(relsAsB ?? []).map((r) => ({ otherId: r.entity_a_id, arc_stage: r.arc_stage, sentiment: r.aggregate_sentiment, count: r.interaction_count })),
+  ];
+
+  if (allRels.length > 0) {
+    const otherIds = allRels.map((r) => r.otherId);
     const { data: otherAgents } = await supabase
       .from('agents')
       .select('id, name')
       .in('id', otherIds);
 
     const nameMap = new Map(otherAgents?.map((a) => [a.id, a.name]) ?? []);
-    relationshipEntries = relationships.map((r) => {
-      const otherId = r.agent_a === agentId ? r.agent_b : r.agent_a;
-      return {
-        name: nameMap.get(otherId) || 'Unknown',
-        label: r.label || 'Acquaintance',
-        count: r.interaction_count || 0,
-      };
-    });
+    // Deduplicate by otherId (keep highest interaction count)
+    const seen = new Set<string>();
+    relationshipEntries = allRels
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+      .filter((r) => {
+        if (seen.has(r.otherId)) return false;
+        seen.add(r.otherId);
+        return true;
+      })
+      .slice(0, 10)
+      .map((r) => ({
+        name: nameMap.get(r.otherId) || 'Unknown',
+        label: r.arc_stage || 'new',
+        count: r.count || 0,
+      }));
   }
 
   // ── If no events, return empty journal ──
