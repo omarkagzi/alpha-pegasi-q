@@ -30,32 +30,48 @@ const AGENT_META: Record<string, { role: string; zone: string }> = {
   'Ember': { role: 'Roleplay/Creative/General', zone: 'Tavern District' },
 };
 
-// ── Step 1: QStash Signature Verification ──
+// ── Step 1: Request Verification ──
+// Accepts three auth methods:
+//   1. QStash signature (upstash-signature header)
+//   2. Vercel Cron secret (Authorization: Bearer <CRON_SECRET>)
+//   3. Dev fallback (no keys configured)
 
-async function verifyQStashSignature(req: Request): Promise<boolean> {
+async function verifyRequest(req: Request): Promise<boolean> {
+  // Method 2: Vercel Cron secret
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get('authorization');
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    return true;
+  }
+
+  // Method 1: QStash signature
   const signingKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
   const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
 
-  // In development, allow unauthenticated calls
-  if (!signingKey || !nextSigningKey) {
-    console.warn('[Heartbeat] QStash signing keys not configured — skipping verification');
+  if (signingKey && nextSigningKey) {
+    const receiver = new Receiver({
+      currentSigningKey: signingKey,
+      nextSigningKey: nextSigningKey,
+    });
+
+    const body = await req.text();
+    const signature = req.headers.get('upstash-signature') ?? '';
+
+    try {
+      await receiver.verify({ signature, body });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // Method 3: Dev fallback — no auth configured
+  if (!signingKey && !nextSigningKey && !cronSecret) {
+    console.warn('[Heartbeat] No auth configured — allowing request (dev mode)');
     return true;
   }
 
-  const receiver = new Receiver({
-    currentSigningKey: signingKey,
-    nextSigningKey: nextSigningKey,
-  });
-
-  const body = await req.text();
-  const signature = req.headers.get('upstash-signature') ?? '';
-
-  try {
-    await receiver.verify({ signature, body });
-    return true;
-  } catch {
-    return false;
-  }
+  return false;
 }
 
 // ── Step 6: Narrator LLM call ──
@@ -251,13 +267,23 @@ async function runBeliefUpdate(
 
 // ── Main Route Handler ──
 
+// Vercel Cron sends GET requests
+export async function GET(request: NextRequest) {
+  return handleHeartbeat(request);
+}
+
+// QStash sends POST requests
 export async function POST(request: NextRequest) {
+  return handleHeartbeat(request);
+}
+
+async function handleHeartbeat(request: NextRequest) {
   const supabase = createAdminClient();
 
-  // ── Step 1: Validate QStash signature ──
-  const isValid = await verifyQStashSignature(request.clone());
+  // ── Step 1: Verify request authenticity ──
+  const isValid = await verifyRequest(request.clone());
   if (!isValid) {
-    console.error('[Heartbeat] Invalid QStash signature');
+    console.error('[Heartbeat] Unauthorized request');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

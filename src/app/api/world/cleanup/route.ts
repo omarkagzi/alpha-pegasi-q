@@ -10,32 +10,56 @@ import { createAdminClient } from '@/lib/supabase/server';
 
 const RETENTION_DAYS = 30;
 
-async function verifyQStashSignature(request: Request): Promise<boolean> {
+async function verifyRequest(request: Request): Promise<boolean> {
+  // Vercel Cron secret
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = request.headers.get('authorization');
+  if (cronSecret && authHeader === `Bearer ${cronSecret}`) return true;
+
+  // QStash signature
   const signingKey = process.env.QSTASH_CURRENT_SIGNING_KEY;
   const nextSigningKey = process.env.QSTASH_NEXT_SIGNING_KEY;
-  if (!signingKey || !nextSigningKey) return false;
+  if (signingKey && nextSigningKey) {
+    const receiver = new Receiver({
+      currentSigningKey: signingKey,
+      nextSigningKey,
+    });
 
-  const receiver = new Receiver({
-    currentSigningKey: signingKey,
-    nextSigningKey,
-  });
+    const signature = request.headers.get('upstash-signature');
+    if (!signature) return false;
 
-  const signature = request.headers.get('upstash-signature');
-  if (!signature) return false;
-
-  try {
-    const body = await request.text();
-    await receiver.verify({ signature, body });
-    return true;
-  } catch {
-    return false;
+    try {
+      const body = await request.text();
+      await receiver.verify({ signature, body });
+      return true;
+    } catch {
+      return false;
+    }
   }
+
+  // Dev fallback
+  if (!signingKey && !nextSigningKey && !cronSecret) {
+    console.warn('[Cleanup] No auth configured — allowing request (dev mode)');
+    return true;
+  }
+
+  return false;
 }
 
+// Vercel Cron sends GET requests
+export async function GET(request: NextRequest) {
+  return handleCleanup(request);
+}
+
+// QStash sends POST requests
 export async function POST(request: NextRequest) {
-  const isValid = await verifyQStashSignature(request.clone());
+  return handleCleanup(request);
+}
+
+async function handleCleanup(request: NextRequest) {
+  const isValid = await verifyRequest(request.clone());
   if (!isValid) {
-    console.error('[Cleanup] Invalid QStash signature');
+    console.error('[Cleanup] Unauthorized request');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
