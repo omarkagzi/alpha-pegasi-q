@@ -326,6 +326,26 @@ export class SettlementScene extends Phaser.Scene {
         useWorldStore.getState().addWorldEvents(events);
       })
       .subscribe();
+
+    // Load recent events so the bulletin isn't empty on arrival
+    this.loadRecentEvents();
+  }
+
+  /** Fetch the most recent events from the database to seed the Town Bulletin. */
+  private async loadRecentEvents(): Promise<void> {
+    try {
+      const { data: events, error } = await supabaseAnon
+        .from("agent_events")
+        .select("id, event_type, event_category, involved_agents, location, description, dialogue, created_at")
+        .order("created_at", { ascending: false })
+        .limit(30);
+
+      if (error || !events || events.length === 0) return;
+
+      useWorldStore.getState().addWorldEvents(events as WorldEvent[]);
+    } catch (err) {
+      console.warn("[SettlementScene] Failed to load recent events:", err);
+    }
   }
 
   private cleanup(): void {
