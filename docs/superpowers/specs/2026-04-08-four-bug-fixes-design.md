@@ -40,10 +40,11 @@ Add two rules to the RULES section of `buildNarratorPrompt()`:
 Create a `sanitizeEventText(text: string): string` function that:
 
 1. Detects JSON-like patterns via regex: `\[?\{["']agent_id["']` or `\{["'][a-z_]+["']\s*:` embedded in otherwise prose text
-2. Strips the JSON portion, keeping the prose before it
-3. Trims trailing punctuation artifacts (dangling commas, spaces)
-4. Returns the original text unchanged if no JSON is detected
-5. If the entire text is JSON (no prose prefix), returns an empty string
+2. Also detects: unquoted keys (`\{[a-z_]+\s*:`), markdown-fenced JSON (`` ```json ... ``` ``), and single-quoted JSON variants
+3. Strips the JSON portion, keeping the prose before it
+4. Trims trailing punctuation artifacts (dangling commas, spaces)
+5. Returns the original text unchanged if no JSON is detected
+6. If the entire text is JSON (no prose prefix), returns an empty string
 
 **File:** `src/app/api/world/heartbeat/route.ts`
 
@@ -76,20 +77,30 @@ const cleanDialogue = event.dialogue ? sanitizeEventText(event.dialogue) : null;
 
 **File:** `src/engine/settlement/worldEventRenderer.ts`
 
-In `parseDialogue()`, sanitize the input text before splitting:
+Sanitize at the `playEvent()` entry point so all event types (conversation, activity, observation, trade, reaction) are covered — not just conversations that go through `parseDialogue()`:
 
 ```typescript
 import { sanitizeEventText } from '@/lib/ai/sanitize';
 
-private parseDialogue(text: string): string[] {
-  const clean = sanitizeEventText(text);
-  const lines = clean
-    .split(/\n|(?<=[.!?])\s+/)
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
-  return lines.slice(0, 4);
+private playEvent(queued: QueuedEvent): void {
+  queued.played = true;
+  // Sanitize both fields once, before any play* method uses them
+  const event = {
+    ...queued.event,
+    description: sanitizeEventText(queued.event.description),
+    dialogue: queued.event.dialogue ? sanitizeEventText(queued.event.dialogue) : null,
+  };
+
+  switch (event.event_type) {
+    case "conversation":
+      this.playConversation(event);
+      break;
+    // ... rest unchanged
+  }
 }
 ```
+
+This ensures `playActivity`, `playObservation`, `playTrade`, and `playReaction` all receive clean text, since they pass `event.description` directly to `SpeechBubble` without going through `parseDialogue`.
 
 **Files touched:**
 - `src/lib/ai/sanitize.ts` (new)
@@ -223,7 +234,7 @@ And that the returned `AgentRecord` includes `capabilities: agent.capabilities ?
 | `src/lib/ai/prompts/narrator.ts` | Modify | 1 & 2 |
 | `src/app/api/world/heartbeat/route.ts` | Modify | 1 & 2 |
 | `src/components/settlement/ActivityFeed.tsx` | Modify | 1 & 2 |
-| `src/engine/settlement/worldEventRenderer.ts` | Modify | 1 & 2 |
+| `src/engine/settlement/worldEventRenderer.ts` | Modify (sanitize in `playEvent()`) | 1 & 2 |
 | `src/engine/settlement/playerController.ts` | Modify | 3 |
 | `supabase/migrations/XXXX_update_agent_prompts.sql` | Create | 4 |
 | `src/lib/ai/prompts/system.ts` | Modify | 4 |
