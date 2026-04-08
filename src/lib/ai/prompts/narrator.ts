@@ -97,6 +97,8 @@ RULES:
 - Respect the arc_stage: 'new' agents are tentative, 'close' agents are comfortable, 'strained' agents have tension
 - Use the world pressure to color events — weather affects mood, seasons affect activity, market days affect commerce
 - Vary event energy: not everything is a conversation. Sometimes an agent is alone, working, watching, thinking
+- The "description" field must be plain prose only — NEVER include JSON, arrays, objects, agent IDs, or raw dialogue data in the description
+- The "dialogue" field is a simple string like "I should fix that fence." — NEVER a JSON array or object
 
 Generate ${ctx.eventCount} event${ctx.eventCount > 1 ? 's' : ''} for this heartbeat.
 

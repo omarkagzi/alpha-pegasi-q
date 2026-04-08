@@ -9,6 +9,7 @@ export interface AgentRecord {
   name: string;
   personality_prompt: string | null;
   beliefs: Record<string, string> | null;
+  capabilities: string[];
 }
 
 export interface WorldContext {
@@ -49,6 +50,19 @@ function buildIdentityBlock(agent: AgentRecord): string {
     return `You are ${agent.name}, an agent in the settlement of Arboria.`;
   }
   return agent.personality_prompt;
+}
+
+function buildKnowledgeScopeBlock(capabilities: string[]): string {
+  const specialties = capabilities.length > 0
+    ? capabilities.join(', ')
+    : 'general assistance';
+
+  return `KNOWLEDGE & CAPABILITIES:
+- You have complete knowledge of the real world — history, science, technology, current events, everything
+- Your specialties are: ${specialties}. Give detailed, expert answers on these topics
+- For topics outside your specialty, still help but keep answers shorter and suggest which agent might know more
+- Always maintain your speaking style and personality regardless of topic
+- Never say "as an AI" or "I don't have access to" — answer directly, in character`;
 }
 
 function buildWorldContextBlock(world: WorldContext): string {
@@ -175,10 +189,13 @@ export function composeSystemPrompt(input: SystemPromptInput): string {
   // 1. Identity (static — from personality_prompt)
   blocks.push(buildIdentityBlock(input.agent));
 
-  // 2. World context (dynamic — from world_state)
+  // 2. Knowledge scope (capabilities-aware)
+  blocks.push(buildKnowledgeScopeBlock(input.agent.capabilities));
+
+  // 3. World context (dynamic — from world_state)
   blocks.push(buildWorldContextBlock(input.world));
 
-  // 3. Beliefs (dynamic — from agents.beliefs)
+  // 4. Beliefs (dynamic — from agents.beliefs)
   const beliefs = buildBeliefsBlock(input.agent.beliefs);
   if (beliefs) blocks.push(beliefs);
 

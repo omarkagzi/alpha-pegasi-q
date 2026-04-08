@@ -13,6 +13,7 @@ import { createProvider, type ChatMessage } from '@/lib/ai/provider';
 import { getActivePressures, getWorldTimeInfo } from '@/lib/world/pressures';
 import { getAvailableCategories, selectRequiredCategories, type RecentEvent } from '@/lib/world/categories';
 import { selectAgentsForHeartbeat, type HeartbeatAgent } from '@/lib/world/agentSelection';
+import { sanitizeEventText } from '@/lib/ai/sanitize';
 import { deduplicateEvents, type GeneratedEvent, type StoredEvent } from '@/lib/world/deduplication';
 import { updateRelationshipsFromEvent } from '@/lib/memory/relationships';
 import { buildNarratorPrompt, buildRepromptInstruction, type NarratorContext } from '@/lib/ai/prompts/narrator';
@@ -459,6 +460,16 @@ async function handleHeartbeat(request: NextRequest) {
     const storedEvents: Array<Record<string, unknown>> = [];
 
     for (const event of finalEvents) {
+      // Sanitize LLM output — strip any embedded JSON from prose fields
+      const cleanDescription = sanitizeEventText(event.description);
+      const cleanDialogue = event.dialogue ? sanitizeEventText(event.dialogue) : null;
+
+      // Skip event if description is empty after sanitization
+      if (!cleanDescription) {
+        console.warn('[Heartbeat] Skipping event with empty description after sanitization');
+        continue;
+      }
+
       const { data: inserted, error } = await supabase
         .from('agent_events')
         .insert({
@@ -466,8 +477,8 @@ async function handleHeartbeat(request: NextRequest) {
           event_category: event.event_category,
           involved_agents: event.involved_agents,
           location: event.location,
-          description: event.description,
-          dialogue: event.dialogue ?? null,
+          description: cleanDescription,
+          dialogue: cleanDialogue,
           world_context: worldContext,
         })
         .select()

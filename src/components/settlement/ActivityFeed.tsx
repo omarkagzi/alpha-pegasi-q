@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useWorldStore, type WorldEvent } from "@/stores/worldStore";
+import { sanitizeEventText } from "@/lib/ai/sanitize";
 
 /**
  * Format a timestamp as a relative time string (e.g., "2 min ago").
@@ -116,13 +117,18 @@ export default function ActivityFeed() {
 }
 
 function EventEntry({ event }: { event: WorldEvent }) {
+  const cleanDesc = sanitizeEventText(event.description);
+  const cleanDialogue = event.dialogue ? sanitizeEventText(event.dialogue) : null;
+
+  if (!cleanDesc) return null; // Skip fully-corrupt entries
+
   return (
     <div className="text-xs leading-relaxed font-sans text-gray-300">
       <span className="text-gray-500 mr-1">*</span>
-      {event.description}
-      {event.dialogue && (
+      {cleanDesc}
+      {cleanDialogue && (
         <span className="text-amber-400/70 italic">
-          {" "}&ldquo;{event.dialogue.split("\n")[0]}&rdquo;
+          {" "}&ldquo;{cleanDialogue.split("\n")[0]}&rdquo;
         </span>
       )}
       <span className="text-gray-600 text-[10px] ml-2 whitespace-nowrap">

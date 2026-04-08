@@ -44,7 +44,7 @@ export async function assembleAgentContext(
       // 1. Agent record
       supabase
         .from('agents')
-        .select('id, name, personality_prompt, beliefs, provider, model_id')
+        .select('id, name, personality_prompt, beliefs, provider, model_id, capabilities')
         .eq('id', agentId)
         .single(),
 
@@ -116,6 +116,7 @@ export async function assembleAgentContext(
     name: agentData.name,
     personality_prompt: agentData.personality_prompt,
     beliefs: agentData.beliefs,
+    capabilities: agentData.capabilities ?? [],
   };
 
   // Build world context (fallback to sensible defaults if world_state missing)

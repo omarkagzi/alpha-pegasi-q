@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { NpcManager } from "./npcManager";
 import { SpeechBubble } from "./speechBubble";
 import type { WorldEvent } from "@/stores/worldStore";
+import { sanitizeEventText } from "@/lib/ai/sanitize";
 
 // ── Constants ─────────────────────────────────────────────────────
 const STAGGER_INTERVAL_MS = 90_000; // 90 seconds between events
@@ -92,7 +93,16 @@ export class WorldEventRenderer {
 
   private playEvent(queued: QueuedEvent): void {
     queued.played = true;
-    const event = queued.event;
+
+    // Sanitize both fields once, before any play* method uses them
+    const event = {
+      ...queued.event,
+      description: sanitizeEventText(queued.event.description),
+      dialogue: queued.event.dialogue ? sanitizeEventText(queued.event.dialogue) : null,
+    };
+
+    // Skip if description was entirely JSON garbage
+    if (!event.description) return;
 
     switch (event.event_type) {
       case "conversation":

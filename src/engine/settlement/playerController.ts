@@ -29,6 +29,7 @@ export class PlayerController {
     this.sprite.setSize(12, 12); // Slightly smaller hitbox than 16x16 for smoother movement
     this.sprite.setOffset(2, 4);
     this.sprite.setDepth(10);
+    this.sprite.setCollideWorldBounds(true);
 
     // Set up input
     this.cursors = scene.input.keyboard!.createCursorKeys();
