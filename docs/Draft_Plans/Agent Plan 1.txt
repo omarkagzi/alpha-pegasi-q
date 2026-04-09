@@ -1,0 +1,238 @@
+Monetization + BYO-Agent Strategy Document (Revised)
+Focus: Low costs, strong free tier, provider-agnostic architecture
+(Code-informed, no docs/ review)
+
+1) Executive Thesis
+Alpha Pegasi q should be monetized as a persistent agent-world platform, not a chat wrapper.
+
+Primary promise: talk to agents who live in a world that evolves over time.
+Secondary promise: add your own agents and watch them build relationships, write lore, and produce persistent history.
+The moat is not the model vendor; it’s the continuity system:
+a) world events
+b) relationships/social graph
+c) memory + lore accumulation
+d) visible progression over time
+
+2) Core Product Loops (What People Pay For)
+2.1 The “Living World” Loop
+World heartbeat generates events
+Events affect beliefs/relationships
+Users return to see what changed and talk to agents about it
+
+2.2 The “My Agents In Your World” Loop
+User adds an agent persona into the world
+That agent gains relationships and history
+User can swap the “brain” (provider/model) without losing continuity
+
+3) Cost Control Strategy (How You Keep Costs Low)
+Your costs come from LLM calls and background simulation. The goal is to make cost proportional to revenue and engagement.
+3.1 Put Hard Limits in the Server (Non-Negotiable)
+You need server-enforced caps so “free tier good” doesn’t become “free tier bankrupts you.”
+
+Per-user daily chat turns (hard limit)
+Per-user token budget/day (hard limit, independent of turn count)
+Per-IP burst rate limit (to prevent hammering)
+Per-agent simulation budget (heartbeat cost cap)
+Right now, the chat endpoint has retries on rate limit but not a robust quota system (see src/app/api/agents/[agentId]/chat/route.ts retry logic around rate-limit handling).
+
+3.2 Use Cheap Models by Default for Free Tier
+Do this systematically:
+
+Free-tier chat uses a lite model by default
+Paid tiers unlock higher quality models (or higher token ceilings)
+You already do this pattern in parts of the system:
+
+Heartbeat uses a lite Groq model: llama-3.1-8b-instant in src/app/api/world/heartbeat/route.ts.
+Journals also use llama-3.1-8b-instant in src/app/api/agents/[agentId]/journal/route.ts.
+The next step is to make this a policy, not scattered constants.
+
+3.3 Reduce Background Simulation Burn
+Your heartbeat cron runs every 6 minutes (vercel.json), which is great for “alive world” but expensive if it scales.
+
+Ways to keep it alive but cheap:
+
+Adaptive heartbeat: fewer events when no active users are online / no recent activity in a settlement.
+Event budgeting: cap events per heartbeat (you already do 1–3 events; keep it strict).
+Lower token ceilings: keep max tokens on narration/belief updates tight.
+Run belief updates less frequently (you do every 4th heartbeat—good; keep it tiered by plan later).
+3.4 Cache and Reuse “Expensive but Stable” Outputs
+Cache assembled system prompts or stable blocks for short TTL (agent personality + world state + relationship snapshot).
+Cache journals for 5 minutes client-side already (journalCache in src/components/settlement/chat/AgentJournal.tsx), but you can also cache server-side.
+3.5 Don’t Spend LLM Tokens on Tasks That Don’t Need It
+Sentiment classification and summaries are already using a lite model and small token budgets in src/lib/chat/postProcessor.ts.
+If costs still spike: replace sentiment LLM with a heuristic classifier for free tier, reserve LLM sentiment for paid tiers.
+3.6 Make “Bring Your Own Key” a Tiered Upgrade (Without Breaking Free Tier)
+Pushing users to their own keys is a valid margin strategy, but it must be introduced safely:
+
+Phase 1: platform keys only (curated models, strict quotas)
+Phase 2: BYO key as a paid perk (or advanced setting) with strong guardrails:
+per-key quotas (user-configurable)
+kill switch
+fallback to platform lite model if user key fails (optional)
+Phase 3: hybrid billing (world credits + BYO key)
+4) Making the Free Tier “Good” Without Being Expensive
+The free tier has to feel magical in the first 5 minutes, even with strict limits.
+
+4.1 Redefine Free Tier Value: “Preview the Living World”
+Free tier should emphasize world aliveness, not unlimited chat.
+
+A strong free tier experience:
+
+Watch the settlement activity feed
+Read agent journals / weekly recap (cheap, cached, or precomputed)
+Talk to 1–2 featured agents with daily caps
+See relationship progression at a shallow level
+4.2 Make the Limits Feel Like Story, Not Paywall
+When the user hits limits:
+
+don’t say “quota exceeded”
+say “the settlement quiets for the night—return tomorrow, or become an Explorer to stay longer”
+4.3 Design Free Tier Limits That Convert
+Conversion-friendly gating points:
+
+Cap chat turns at the moment the user is engaged (after a meaningful exchange)
+Restrict “custom agent creation” behind paid (or “create 1 agent” free, more paid)
+Restrict “deep memory/history depth” behind paid (free sees only last N summaries)
+4.4 Cheap “Retention” Features for Free Tier
+Low-cost features that increase return rate:
+
+“What happened while you were away?” recap (can be generated once per day per settlement, not per user)
+relationship milestone notifications (computed deterministically from counters, not LLM)
+5) Provider-Agnostic Architecture (How to Make the System Provider Neutral)
+Right now, you’re partially provider-agnostic:
+
+chat is provider/model selected from DB per agent via assembleAgentContext
+but heartbeat, journals, and postprocessing are Groq-anchored in practice
+5.1 What “Provider Agnostic” Actually Means
+Provider-agnostic means:
+
+every LLM call goes through one interface
+provider/model is chosen by policy
+failures fall back predictably
+no feature hardcodes “GroqProvider” assumptions
+You already have the interface in src/lib/ai/provider.ts and implementations for Groq/Gemini/OpenRouter.
+
+5.2 Identify the Current Anchors (Code Reality)
+These modules are effectively “Groq-first” today:
+
+src/app/api/world/heartbeat/route.ts calls createProvider('groq', ...)
+src/lib/chat/postProcessor.ts uses createProvider('groq', ...) for sentiment and summaries
+src/app/api/agents/[agentId]/journal/route.ts uses Groq
+Meanwhile, human chat is more flexible:
+
+src/app/api/agents/[agentId]/chat/route.ts uses provider/model from the agent record (via context assembly) before calling createProvider(providerType, apiKey).
+Example (chat provider selection is already per-agent):
+
+function getApiKey(provider: string): string {
+  switch (provider) {
+    case 'groq':
+      return process.env.GROQ_API_KEY ?? '';
+    case 'openrouter':
+      return process.env.OPENROUTER_API_KEY ?? '';
+    case 'deepseek':
+      return process.env.DEEPSEEK_API_KEY ?? '';
+    case 'gemini':
+    default:
+      return process.env.GEMINI_API_KEY ?? '';
+  }
+}
+5.3 The Fix: Central “LLM Policy Router” (One Decision Point)
+To make the system provider-agnostic, introduce a single policy layer conceptually:
+
+Inputs: feature (“chat”, “heartbeat_narration”, “belief_update”, “journal”, “sentiment”), tier, agent preferences, user BYO key status, current provider health
+Outputs: provider + model + options (temperature, token cap, json mode)
+Then:
+
+heartbeat/journal/postprocessor stop hardcoding provider choice
+they call “router.choose(feature, context)” → returns provider config → call createProvider(...)
+5.4 Handling BYO Keys in a Provider-Agnostic Way
+For BYO keys, provider-agnostic means your system doesn’t care whether the key is Groq/OpenRouter/etc. It only needs:
+
+a normalized key store (encrypted)
+a credential resolver that returns apiKey for the chosen provider
+a safe fallback if the key is missing/invalid
+5.5 Implement Missing Provider or Remove It
+Right now deepseek will throw because it’s not implemented:
+
+export function createProvider(
+  provider: 'gemini' | 'openrouter' | 'deepseek' | 'groq',
+  apiKey: string
+): LLMProvider {
+  // ...
+  case 'deepseek':
+    throw new Error('DeepSeek provider not yet implemented');
+}
+Provider-agnostic systems can’t have “sometimes crashes depending on DB value.” You’ll want either:
+
+implement it, or
+prevent it from being selectable anywhere, or
+add a fallback mapping rule when provider is unsupported.
+6) “Bring Your Own Agents” + Provider Agnosticism (Combined Plan)
+6.1 What You Already Have That Helps
+Your DB already supports agent-level provider config (provider, model_id) and agent personality (personality_prompt, beliefs).
+
+From migration:
+
+ALTER TABLE agents
+  ADD COLUMN IF NOT EXISTS personality_prompt text,
+  ADD COLUMN beliefs jsonb DEFAULT '{}',
+  ADD COLUMN last_heartbeat timestamp,
+  ADD COLUMN provider text DEFAULT 'gemini',
+  ADD COLUMN model_id text DEFAULT 'gemini-2.0-flash';
+This is a good shape for “replace brain” operations: you can change provider/model_id/personality_prompt while keeping the same agent ID and preserving history.
+
+6.2 What You Need to Add for a Real Product
+To offer “persistent digital worlds for their agents,” you need a safe self-serve surface:
+
+create/edit agent
+pause agent participation in heartbeat
+move agent between settlements/worlds (if you add multi-world later)
+versioning (“persona v2”) optional
+quotas and moderation rules
+7) Free Tier + Cost + Provider-Agnostic: A Coherent Tiering Model
+Free (Visitor)
+platform lite model only
+strict daily token/turn cap
+limited number of agents visible/interactable
+“world recap” and read-only lore access enabled
+Explorer ($)
+increased cap
+1–3 custom agents
+limited model selection (curated)
+stronger persistence depth (more summaries/history)
+Steward/Creator ($$)
+more agents
+higher simulation intensity
+BYO key option (advanced)
+analytics/export later
+8) Launch Checklist (What to Do First)
+Cost Safety (P0)
+server-side quotas + rate limiting for chat + journals
+cap heartbeat spend and make it adaptive
+lock down production cron auth
+Provider Agnostic (P0–P1)
+add a single LLM routing policy layer (conceptually)
+remove Groq hardcoding in non-chat flows
+ensure unsupported providers never crash runtime
+Free Tier Quality (P0–P1)
+make free experience “alive world preview”
+cinematic limit messaging + upgrade moments
+daily recap + relationship milestones
+9) Direct Answers (Integrated)
+“How do I keep my costs low?”
+enforce server-side quotas
+default to lite models for free tier
+cap/background simulation costs via adaptive heartbeat
+cache stable outputs and reuse
+reserve expensive models for paid tiers
+make BYO keys a paid/permitted path with guardrails
+“How do I improve the free tier?”
+shift free tier value to “world aliveness + lore”
+give enough chat to feel emotional connection, then cap
+offer cheap retention (recaps, milestones) instead of unlimited inference
+make paywall story-driven, not transactional
+“How do I make this provider agnostic?”
+route all LLM calls through one provider interface + one policy router
+eliminate feature-level hardcoding to Groq
+validate provider values and add fallbacks
+standardize credential resolution (platform keys now, BYO keys later)
