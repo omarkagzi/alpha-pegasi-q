@@ -284,8 +284,8 @@ A Steward is a Traveler who chose to invest in their world. The upgrade narrativ
 | Webhook Event | Action |
 |---|---|
 | `checkout.session.completed` | Increment Founder counter (if applicable). Update `users.tier` to `steward`. Store `stripe_customer_id` and `stripe_subscription_id` on user record. Record `founder_seat_number` if applicable. |
-| `customer.subscription.deleted` | Downgrade `users.tier` to `visitor`. Preserve conversation history (don't delete data). |
-| `invoice.payment_failed` | Mark user as `payment_grace` status. Allow 3-day grace period. If still failed after 3 days, downgrade to `visitor`. Send notification email. |
+| `customer.subscription.deleted` | Downgrade `users.tier` to `traveler`. Preserve conversation history (don't delete data). |
+| `invoice.payment_failed` | Mark user as `payment_grace` status. Allow 3-day grace period. If still failed after 3 days, downgrade to `traveler`. Send notification email. |
 
 **Founder seat counter:**
 - Stored as an atomic counter in a Supabase config table (`app_config.founder_seats_claimed`)
@@ -360,7 +360,10 @@ Everything in this section must ship before the landing page accepts real users.
   - Traveler chat: `llama-3.1-8b-instant` (Groq)
   - Steward chat: `llama-3.3-70b-versatile` (Groq)
   - Heartbeat/journal/summary (all tiers): `llama-3.1-8b-instant` (Groq) — background processes always use the cheapest model
-- Fallback chain: if primary provider returns 429 or 500, fall back to next tier-allowed provider
+- Fallback chain: if primary provider (Groq) returns 429 or 500, fall back to Gemini with these mappings:
+  - Traveler chat fallback: `gemini-2.0-flash` (comparable to `llama-3.1-8b-instant`)
+  - Steward chat fallback: `gemini-2.0-flash` (comparable to `llama-3.3-70b-versatile`)
+  - Heartbeat/journal/summary fallback: `gemini-2.0-flash` (cheapest available)
 - Token budget enforcement: hard `max_tokens` per feature per tier, set in policy, not in route handlers
 - Temperature and response format (text vs JSON) set per feature in policy
 
@@ -383,7 +386,7 @@ Everything in this section must ship before the landing page accepts real users.
 **Implementation:**
 - **Daily turn counter:** Stored in Supabase (a `user_daily_usage` table with `user_id`, `date`, `chat_turns_used`). Incremented atomically on each chat request. Checked before LLM call, not after.
 - **Tier limits:** Traveler = 10 turns/day. Steward = 50 turns/day. Limits read from a config table, not hardcoded, so they can be adjusted without a deploy.
-- **Reset:** At midnight UTC (or local midnight if feasible — UTC is simpler for v1).
+- **Reset:** At midnight UTC. All daily counters key on UTC date. No local timezone handling for v1.
 - **Enforcement point:** In `/api/agents/[agentId]/chat/route.ts`, before context assembly and LLM call. If quota exhausted, return `{ quota_exceeded: true, narrative_message: "..." }` with a 200 status (not 429 — the frontend renders this as an in-world message, not an error).
 - **Per-IP burst rate limit:** 60 requests/minute using Upstash Ratelimit or Vercel's built-in rate limiting. Returns 429 on breach. This prevents hammering, not usage — it's a safety net, not a product feature.
 - **Token budget per request:** The policy router sets hard `max_tokens` per feature per tier. This prevents a single request from consuming an outsized budget even within the turn count.
@@ -407,6 +410,8 @@ Everything in this section must ship before the landing page accepts real users.
 - `users.founder_seat_number` (integer, nullable)
 - `users.subscription_status` (enum: `none`, `active`, `past_due`, `canceled`)
 - `app_config` table with `key`/`value` rows, including `founder_seats_claimed`
+
+**Tier enum values (canonical):** The `users.tier` column uses these values: `traveler` (free), `steward` (paid). The existing codebase uses `visitor` and `explorer` — these should be migrated to `traveler` and `steward` respectively to match the product narrative. The current `steward` value in the schema can remain as-is.
 
 **Estimated effort:** 2-3 days
 
