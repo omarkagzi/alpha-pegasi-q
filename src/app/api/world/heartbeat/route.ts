@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Receiver } from '@upstash/qstash';
 import { createAdminClient } from '@/lib/supabase/server';
 import { createProvider, type ChatMessage } from '@/lib/ai/provider';
+import { choosePolicy, getProviderApiKey, policyToLlmOptions } from '@/lib/ai/policyRouter';
 import { getActivePressures, getWorldTimeInfo } from '@/lib/world/pressures';
 import { getAvailableCategories, selectRequiredCategories, type RecentEvent } from '@/lib/world/categories';
 import { selectAgentsForHeartbeat, type HeartbeatAgent } from '@/lib/world/agentSelection';
@@ -18,9 +19,6 @@ import { deduplicateEvents, type GeneratedEvent, type StoredEvent } from '@/lib/
 import { updateRelationshipsFromEvent } from '@/lib/memory/relationships';
 import { buildNarratorPrompt, buildRepromptInstruction, type NarratorContext } from '@/lib/ai/prompts/narrator';
 import { buildBeliefUpdatePrompt, type BeliefUpdateContext } from '@/lib/ai/prompts/beliefs';
-
-const LITE_MODEL = 'llama-3.1-8b-instant';
-const GROQ_API_KEY = () => process.env.GROQ_API_KEY ?? '';
 
 // Agent roles and default zones for narrator context
 const AGENT_META: Record<string, { role: string; zone: string }> = {
@@ -81,7 +79,8 @@ async function callNarrator(
   prompt: string,
   repromptHint?: string,
 ): Promise<GeneratedEvent[]> {
-  const provider = createProvider('groq', GROQ_API_KEY());
+  const narratorPolicy = choosePolicy('heartbeat', 'steward');
+  const provider = createProvider(narratorPolicy.provider, getProviderApiKey(narratorPolicy.provider));
   const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
 
   if (repromptHint) {
@@ -89,10 +88,7 @@ async function callNarrator(
   }
 
   const result = await provider.chat(messages, {
-    model: LITE_MODEL,
-    temperature: 0.9,
-    max_tokens: 1000,
-    response_format: 'json',
+    ...policyToLlmOptions(narratorPolicy),
   });
 
   // Parse the JSON response — handle both array and single object
@@ -163,7 +159,8 @@ async function runBeliefUpdate(
 
   if (!agents || agents.length === 0) return;
 
-  const provider = createProvider('groq', GROQ_API_KEY());
+  const beliefPolicy = choosePolicy('heartbeat', 'steward');
+  const provider = createProvider(beliefPolicy.provider, getProviderApiKey(beliefPolicy.provider));
 
   for (const agent of agents) {
     try {
@@ -235,7 +232,7 @@ async function runBeliefUpdate(
       const prompt = buildBeliefUpdatePrompt(beliefCtx);
       const result = await provider.chat(
         [{ role: 'user', content: prompt }],
-        { model: LITE_MODEL, temperature: 0.7, max_tokens: 500, response_format: 'json' },
+        { ...policyToLlmOptions(beliefPolicy) },
       );
 
       let updatedBeliefs: Record<string, string>;

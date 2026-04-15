@@ -152,6 +152,6 @@ export function policyToLlmOptions(policy: LlmPolicy) {
     model: policy.model,
     temperature: policy.temperature,
     max_tokens: policy.maxTokens,
-    response_format: policy.responseFormat === 'json' ? { type: 'json_object' as const } : undefined,
+    response_format: policy.responseFormat as 'text' | 'json',
   };
 }

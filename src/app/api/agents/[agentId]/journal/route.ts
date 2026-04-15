@@ -6,19 +6,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { createProvider, type ChatMessage } from '@/lib/ai/provider';
+import { choosePolicy, getProviderApiKey, policyToLlmOptions } from '@/lib/ai/policyRouter';
 import { buildJournalPrompt, type JournalContext } from '@/lib/ai/prompts/journal';
 
-const LITE_MODEL = 'llama-3.1-8b-instant';
 const LLM_TIMEOUT_MS = 10_000;
 
 // Today = last 24 real minutes (~24 game-hours at 1 min = 1 game-hour)
 const TODAY_WINDOW_MS = 24 * 60 * 1000;
 // Week = last 168 real minutes (~7 game-days)
 const WEEK_WINDOW_MS = 7 * 24 * 60 * 1000;
-
-function getApiKey(): string {
-  return process.env.GROQ_API_KEY ?? '';
-}
 
 export async function GET(
   request: NextRequest,
@@ -139,7 +135,8 @@ export async function GET(
   };
 
   const prompt = buildJournalPrompt(journalCtx);
-  const llm = createProvider('groq', getApiKey());
+  const journalPolicy = choosePolicy('journal', 'traveler');
+  const llm = createProvider(journalPolicy.provider, getProviderApiKey(journalPolicy.provider));
 
   const messages: ChatMessage[] = [
     { role: 'user', content: prompt },
@@ -150,9 +147,7 @@ export async function GET(
     const timeout = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
 
     const response = await llm.chat(messages, {
-      model: LITE_MODEL,
-      temperature: 0.7,
-      max_tokens: 800,
+      ...policyToLlmOptions(journalPolicy),
     });
 
     clearTimeout(timeout);

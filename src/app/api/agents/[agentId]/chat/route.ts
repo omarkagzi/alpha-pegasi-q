@@ -7,23 +7,11 @@ import { auth } from '@clerk/nextjs/server';
 import { createAdminClient } from '@/lib/supabase/server';
 import { assembleAgentContext } from '@/lib/memory/context';
 import { createProvider, type ChatMessage } from '@/lib/ai/provider';
+import { choosePolicy, getProviderApiKey, policyToLlmOptions, type Tier } from '@/lib/ai/policyRouter';
 import { runPostProcessing } from '@/lib/chat/postProcessor';
 
 const MAX_CONVERSATION_HISTORY = 30;
 const LLM_TIMEOUT_MS = 30_000;
-
-/** Returns the correct API key for the given provider. */
-function getApiKey(provider: string): string {
-  switch (provider) {
-    case 'groq':
-      return process.env.GROQ_API_KEY ?? '';
-    case 'openrouter':
-      return process.env.OPENROUTER_API_KEY ?? '';
-    case 'gemini':
-    default:
-      return process.env.GEMINI_API_KEY ?? '';
-  }
-}
 
 interface ChatRequestBody {
   message: string;
@@ -93,6 +81,8 @@ export async function POST(
       { status: 403 }
     );
   }
+
+  const userTier: Tier = (user.tier === 'steward') ? 'steward' : 'traveler';
 
   // ── Step 2: Parse Request ──
   let body: ChatRequestBody;
@@ -255,22 +245,30 @@ export async function POST(
   llmMessages.push({ role: 'user', content: userMessageContent });
 
   // ── Step 6: LLM Call ──
-  const apiKey = getApiKey(contextResult.agent.provider);
+  const chatPolicy = choosePolicy('chat', userTier);
+  const apiKey = getProviderApiKey(chatPolicy.provider);
   if (!apiKey) {
-    console.error(`[Chat] Missing API key for provider: ${contextResult.agent.provider}`);
+    console.error(`[Chat] Missing API key for provider: ${chatPolicy.provider}`);
     return NextResponse.json(
       { error: ERRORS.server_error },
       { status: 503 }
     );
   }
-  const providerType = contextResult.agent.provider as 'gemini' | 'openrouter' | 'groq';
+  const llmOptions = policyToLlmOptions(chatPolicy);
   let reply: string;
 
   const callLLM = async () => {
-    const provider = createProvider(providerType, apiKey);
-    const llmPromise = provider.chat(llmMessages, {
-      model: contextResult.agent.model_id,
-    });
+    const provider = createProvider(chatPolicy.provider, apiKey);
+    const llmPromise = provider.chat(llmMessages, llmOptions);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), LLM_TIMEOUT_MS)
+    );
+    return Promise.race([llmPromise, timeoutPromise]);
+  };
+
+  const callFallbackLLM = async () => {
+    const fallbackProvider = createProvider(chatPolicy.fallbackProvider, getProviderApiKey(chatPolicy.fallbackProvider));
+    const llmPromise = fallbackProvider.chat(llmMessages, { ...llmOptions, model: chatPolicy.fallbackModel });
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('timeout')), LLM_TIMEOUT_MS)
     );
@@ -282,7 +280,7 @@ export async function POST(
     reply = result.content;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[Chat] LLM call failed (${providerType}):`, message);
+    console.error(`[Chat] LLM call failed (${chatPolicy.provider}):`, message);
 
     if (message === 'timeout') {
       return NextResponse.json(
@@ -291,15 +289,15 @@ export async function POST(
       );
     }
 
-    // Retry once on rate-limit (429)
+    // Retry once on rate-limit (429) using fallback provider
     if (message.includes('429') || message.toLowerCase().includes('rate limit')) {
-      console.warn('[Chat] Rate limited, retrying after 2s...');
+      console.warn('[Chat] Rate limited, retrying with fallback provider...');
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const retryResult = await callLLM();
+        const retryResult = await callFallbackLLM();
         reply = retryResult.content;
       } catch (retryErr) {
-        console.error('[Chat] Retry also failed:', retryErr);
+        console.error('[Chat] Fallback retry also failed:', retryErr);
         return NextResponse.json(
           { error: ERRORS.rate_limit },
           { status: 429 }
@@ -350,7 +348,6 @@ export async function POST(
     agentId,
     userId: user.id,
     agentResponse: reply,
-    groqApiKey: getApiKey('groq'),
   }).catch((err) => console.error('[Chat] Post-processing error:', err));
 
   // ── Step 9: Return Response ──

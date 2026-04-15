@@ -66,12 +66,10 @@ export async function POST(
   }
 
   // Fire and forget — endSession handles its own errors
-  const groqApiKey = process.env.GROQ_API_KEY ?? '';
   endSession(supabase, {
     sessionId: body.session_id,
     agentId,
     clerkId,
-    groqApiKey,
   }).catch((err) => console.error('[ChatEnd] endSession error:', err));
 
   return NextResponse.json({ ok: true });

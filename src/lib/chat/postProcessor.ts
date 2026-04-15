@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createProvider, type ChatMessage } from '@/lib/ai/provider';
+import { choosePolicy, getProviderApiKey, policyToLlmOptions } from '@/lib/ai/policyRouter';
 import {
   buildSentimentPrompt,
   isValidSentiment,
@@ -12,8 +13,6 @@ import {
   mapSentimentToRelationship,
   type ChatSentiment,
 } from '@/lib/ai/prompts/sentiment';
-
-const LITE_MODEL = 'llama-3.1-8b-instant';
 
 // Arc stage progression thresholds
 const ARC_THRESHOLDS: Record<string, number> = {
@@ -32,12 +31,11 @@ export async function runPostProcessing(
     agentId: string;
     userId: string;
     agentResponse: string;
-    groqApiKey: string;
   }
 ): Promise<void> {
   try {
     // 1. Classify sentiment via cheap LLM call
-    const sentiment = await classifySentiment(opts.agentResponse, opts.groqApiKey);
+    const sentiment = await classifySentiment(opts.agentResponse);
 
     // 2. Update relationship (parallel with reputation)
     await Promise.all([
@@ -51,16 +49,14 @@ export async function runPostProcessing(
 
 async function classifySentiment(
   agentResponse: string,
-  apiKey: string
 ): Promise<ChatSentiment> {
   try {
-    const provider = createProvider('groq', apiKey);
+    const sentimentPolicy = choosePolicy('sentiment', 'traveler');
+    const provider = createProvider(sentimentPolicy.provider, getProviderApiKey(sentimentPolicy.provider));
     const prompt = buildSentimentPrompt(agentResponse);
     const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
     const result = await provider.chat(messages, {
-      model: LITE_MODEL,
-      temperature: 0,
-      max_tokens: 10,
+      ...policyToLlmOptions(sentimentPolicy),
     });
     const raw = result.content.trim().toLowerCase();
     return isValidSentiment(raw) ? raw : 'neutral';
@@ -158,7 +154,6 @@ export async function endSession(
     sessionId: string;
     agentId: string;
     clerkId: string;
-    groqApiKey: string;
   }
 ): Promise<void> {
   try {
@@ -172,7 +167,8 @@ export async function endSession(
     if (!session?.messages || session.messages.length === 0) return;
 
     // Generate summary via LLM
-    const provider = createProvider('groq', opts.groqApiKey);
+    const summaryPolicy = choosePolicy('summary', 'traveler');
+    const provider = createProvider(summaryPolicy.provider, getProviderApiKey(summaryPolicy.provider));
     const messages = session.messages as Array<{ role: string; content: string }>;
     const transcript = messages
       .map((m: { role: string; content: string }) => `${m.role}: ${m.content}`)
@@ -186,20 +182,22 @@ export async function endSession(
           content: `Summarize this conversation in 1-2 sentences. Focus on the main topic and outcome.\n\n${transcript}`,
         },
       ],
-      { model: LITE_MODEL, temperature: 0, max_tokens: 100 }
+      { ...policyToLlmOptions(summaryPolicy) }
     );
 
     const summary = summaryResult.content.trim();
 
     // Classify overall sentiment
-    const sentimentResult = await provider.chat(
+    const sentimentPolicy = choosePolicy('sentiment', 'traveler');
+    const sentimentProvider = createProvider(sentimentPolicy.provider, getProviderApiKey(sentimentPolicy.provider));
+    const sentimentResult = await sentimentProvider.chat(
       [
         {
           role: 'user',
           content: buildSentimentPrompt(transcript),
         },
       ],
-      { model: LITE_MODEL, temperature: 0, max_tokens: 10 }
+      { ...policyToLlmOptions(sentimentPolicy) }
     );
     const sentimentRaw = sentimentResult.content.trim().toLowerCase();
     const sentiment = isValidSentiment(sentimentRaw) ? sentimentRaw : 'neutral';
