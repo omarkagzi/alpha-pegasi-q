@@ -9,6 +9,8 @@ import { assembleAgentContext } from '@/lib/memory/context';
 import { createProvider, type ChatMessage } from '@/lib/ai/provider';
 import { choosePolicy, getProviderApiKey, policyToLlmOptions, type Tier } from '@/lib/ai/policyRouter';
 import { runPostProcessing } from '@/lib/chat/postProcessor';
+import { checkAndIncrementQuota } from '@/lib/quota/usageQuota';
+import { checkRateLimit } from '@/lib/quota/rateLimiter';
 
 const MAX_CONVERSATION_HISTORY = 30;
 const LLM_TIMEOUT_MS = 30_000;
@@ -38,6 +40,17 @@ export async function POST(
   { params }: { params: Promise<{ agentId: string }> }
 ) {
   const { agentId } = await params;
+
+  // ── Step 0: Per-IP Burst Rate Limiting ──
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ?? 'unknown';
+  const rateCheck = checkRateLimit(ip);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait a moment.' },
+      { status: 429 }
+    );
+  }
+
   const supabase = createAdminClient();
 
   // ── Step 1: Authentication ──
@@ -181,6 +194,27 @@ export async function POST(
       { error: ERRORS.agent_not_found },
       { status: 404 }
     );
+  }
+
+  // ── Step 4b: Quota Enforcement (before any LLM call) ──
+  const agentName = contextResult.agent.name;
+  const quotaResult = await checkAndIncrementQuota(
+    user.id,
+    userTier,
+    agentName
+  );
+
+  if (!quotaResult.allowed) {
+    return NextResponse.json({
+      session_id: sessionId ?? null,
+      reply: null,
+      agent_name: agentName,
+      sentiment: null,
+      quota_exceeded: true,
+      narrative_message: quotaResult.narrativeMessage,
+      turns_used: quotaResult.turnsUsed,
+      turns_limit: quotaResult.turnsLimit,
+    });
   }
 
   // ── Step 5: Build LLM Messages ──
