@@ -285,6 +285,65 @@ async function handleHeartbeat(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // ── Step 1b: Adaptive heartbeat — gate based on active user population ──
+  // ARCHITECTURE NOTE: The current heartbeat processes one shared world (Arboria).
+  // Per-user worlds don't exist yet, so this logic gates whether the heartbeat
+  // runs AT ALL, not per-user. When per-user worlds are added, this filtering
+  // will need to select which worlds to process.
+  //
+  // What this achieves:
+  // - Skip heartbeat entirely if no users have been active recently (saves ~100% of LLM cost)
+  // - Reduce cadence when only free-tier users are active (saves ~80% of LLM cost)
+  // - Full cadence when any Steward is active
+
+  const { data: activeUsers } = await supabase
+    .from('users')
+    .select('id, tier, last_login')
+    .not('last_login', 'is', null);
+
+  if (!activeUsers || activeUsers.length === 0) {
+    return NextResponse.json({
+      events: [],
+      meta: { skipped: true, reason: 'no_active_users' },
+    });
+  }
+
+  const now = new Date();
+  const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+  const hasActiveSteward = activeUsers.some((u) => {
+    const timeSinceLogin = now.getTime() - new Date(u.last_login).getTime();
+    return u.tier === 'steward' && timeSinceLogin < SEVEN_DAYS_MS;
+  });
+
+  const hasActiveTraveler = activeUsers.some((u) => {
+    const timeSinceLogin = now.getTime() - new Date(u.last_login).getTime();
+    return u.tier !== 'steward' && timeSinceLogin < THREE_DAYS_MS;
+  });
+
+  if (!hasActiveSteward && !hasActiveTraveler) {
+    return NextResponse.json({
+      events: [],
+      meta: { skipped: true, reason: 'all_worlds_dormant' },
+    });
+  }
+
+  // If only travelers are active (no stewards), reduce to ~30-min cadence
+  if (!hasActiveSteward) {
+    const minuteOfDay = now.getHours() * 60 + now.getMinutes();
+    const heartbeatSlot = Math.floor(minuteOfDay / 6);
+    if (heartbeatSlot % 5 !== 0) {
+      return NextResponse.json({
+        events: [],
+        meta: { skipped: true, reason: 'traveler_only_reduced_cadence' },
+      });
+    }
+  }
+
+  // If we reach here: at least one steward is active → full 6-min cadence
+  // OR: traveler-only AND this is the 1-in-5 heartbeat slot → proceed
+
   try {
     // ── Step 2: Load world state ──
     const timeInfo = getWorldTimeInfo();
