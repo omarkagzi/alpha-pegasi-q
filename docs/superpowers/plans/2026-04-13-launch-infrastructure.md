@@ -4,9 +4,9 @@
 
 **Goal:** Ship all infrastructure required for a public launch of Alpha Pegasi Q with a free Traveler tier and paid Steward/Founder tier ($8/month).
 
-**Architecture:** Adds a central LLM policy router, server-side usage quotas, Stripe payments with Founder scarcity mechanics, adaptive heartbeat, and a public landing page to the existing Next.js + Supabase + Clerk + Groq stack. All changes are additive to the existing codebase — no rewrites.
+**Architecture:** Adds a central LLM policy router, server-side usage quotas, Dodo Payments with Founder scarcity mechanics, adaptive heartbeat, and a public landing page to the existing Next.js + Supabase + Clerk + Groq stack. All changes are additive to the existing codebase — no rewrites.
 
-**Tech Stack:** Next.js 16, React 19, Supabase (PostgreSQL), Clerk auth, Stripe (new), Groq/Gemini LLMs, Sentry (new), PostHog (new), Upstash Ratelimit (new), TailwindCSS
+**Tech Stack:** Next.js 16, React 19, Supabase (PostgreSQL), Clerk auth, Dodo Payments (new), Groq/Gemini LLMs, Sentry (new), PostHog (new), Upstash Ratelimit (new), TailwindCSS
 
 **Spec Reference:** `docs/superpowers/specs/2026-04-10-launch-strategy-design.md`
 
@@ -22,11 +22,11 @@ src/lib/ai/policyRouter.test.ts     — Tests for policy router
 src/lib/quota/usageQuota.ts         — Daily chat turn tracking + enforcement
 src/lib/quota/usageQuota.test.ts    — Tests for usage quota
 src/lib/quota/rateLimiter.ts        — Per-IP burst rate limiting
-src/lib/stripe/config.ts            — Stripe client + price ID constants
-src/lib/stripe/founderCounter.ts    — Atomic founder seat counter logic
-src/app/api/stripe/checkout/route.ts    — Create Stripe Checkout session
-src/app/api/stripe/webhooks/route.ts    — Stripe webhook handler
-src/app/api/stripe/portal/route.ts      — Customer Portal redirect
+src/lib/dodo/config.ts              — Dodo Payments client + product ID constants
+src/lib/dodo/founderCounter.ts      — Atomic founder seat counter logic
+src/app/api/dodo/checkout/route.ts      — Create Dodo Checkout session
+src/app/api/dodo/webhooks/route.ts      — Dodo webhook handler
+src/app/api/dodo/portal/route.ts        — Customer Portal redirect
 src/app/api/config/founder-count/route.ts — Public founder counter endpoint
 src/app/api/agents/create/route.ts      — Custom agent creation (Steward only)
 src/app/(public)/layout.tsx         — Public layout (no Clerk protection)
@@ -46,7 +46,7 @@ src/components/settlement/AgentCreator.tsx      — Custom agent form (Steward)
 src/components/settlement/RecapCard.tsx         — "While you were away" card
 supabase/migrations/0014_app_config.sql             — app_config table
 supabase/migrations/0015_user_daily_usage.sql       — usage tracking table
-supabase/migrations/0016_add_stripe_fields.sql      — Stripe columns on users
+supabase/migrations/0016_add_dodo_fields.sql        — Dodo Payments columns on users
 supabase/migrations/0017_tier_migration.sql         — visitor→traveler, explorer→traveler
 supabase/migrations/0018_world_recaps.sql           — daily recap table
 sentry.client.config.ts             — Sentry client config
@@ -71,7 +71,7 @@ src/components/settlement/ChatPanel.tsx             — Handle quota_exceeded re
 src/components/settlement/chat/ChatMessages.tsx     — Render quota message + upgrade CTA
 src/components/settlement/ActivityFeed.tsx           — Add tier-aware dialogue visibility
 src/stores/worldStore.ts                            — Add user tier + quota state
-package.json                                        — Add stripe, sentry, posthog, upstash deps
+package.json                                        — Add dodopayments, sentry, posthog, upstash deps
 ```
 
 ---
@@ -1215,33 +1215,33 @@ Dormant worlds: skipped entirely. Saves ~80% of background LLM cost."
 
 ---
 
-## Chunk 3: Stripe Integration + Auth Hardening
+## Chunk 3: Dodo Payments Integration + Auth Hardening
 
-### Task 13: Database Migrations for Stripe Fields + Tier Migration
+### Task 13: Database Migrations for Dodo Fields + Tier Migration
 
 **Files:**
-- Create: `supabase/migrations/0016_add_stripe_fields.sql`
+- Create: `supabase/migrations/0016_add_dodo_fields.sql`
 - Create: `supabase/migrations/0017_tier_migration.sql`
 
-- [ ] **Step 1: Create Stripe fields migration**
+- [ ] **Step 1: Create Dodo fields migration**
 
-Create `supabase/migrations/0016_add_stripe_fields.sql`:
+Create `supabase/migrations/0016_add_dodo_fields.sql`:
 
 ```sql
--- Add Stripe-related columns to users table
+-- Add Dodo Payments columns to users table
 ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS stripe_customer_id text,
-  ADD COLUMN IF NOT EXISTS stripe_subscription_id text,
+  ADD COLUMN IF NOT EXISTS dodo_customer_id text,
+  ADD COLUMN IF NOT EXISTS dodo_subscription_id text,
   ADD COLUMN IF NOT EXISTS founder_seat_number integer,
   ADD COLUMN IF NOT EXISTS subscription_status text DEFAULT 'none'
     CHECK (subscription_status IN ('none', 'active', 'past_due', 'canceled'));
 -- Note: Spec mentions 'payment_grace' status. Simplified to 'past_due' for launch.
 -- Grace period logic (3-day window before downgrade) is a post-launch enhancement.
 
--- Index for Stripe customer lookups (used by webhooks)
-CREATE INDEX IF NOT EXISTS idx_users_stripe_customer_id
-  ON users(stripe_customer_id)
-  WHERE stripe_customer_id IS NOT NULL;
+-- Index for Dodo customer lookups (used by webhooks)
+CREATE INDEX IF NOT EXISTS idx_users_dodo_customer_id
+  ON users(dodo_customer_id)
+  WHERE dodo_customer_id IS NOT NULL;
 ```
 
 - [ ] **Step 2: Create tier migration**
@@ -1282,10 +1282,10 @@ In `src/app/api/agents/[agentId]/chat/route.ts`:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add supabase/migrations/0016_add_stripe_fields.sql supabase/migrations/0017_tier_migration.sql src/app/api/agents/[agentId]/chat/route.ts
-git commit -m "feat: add Stripe columns, migrate tiers to traveler/steward
+git add supabase/migrations/0016_add_dodo_fields.sql supabase/migrations/0017_tier_migration.sql src/app/api/agents/[agentId]/chat/route.ts
+git commit -m "feat: add Dodo Payments columns, migrate tiers to traveler/steward
 
-New columns: stripe_customer_id, stripe_subscription_id,
+New columns: dodo_customer_id, dodo_subscription_id,
 founder_seat_number, subscription_status.
 Migrated visitor/explorer → traveler to match product narrative.
 Auto-provision now creates users as 'traveler' instead of 'explorer'."
@@ -1293,50 +1293,47 @@ Auto-provision now creates users as 'traveler' instead of 'explorer'."
 
 ---
 
-### Task 14: Install Stripe + Create Config Module
+### Task 14: Install Dodo Payments + Create Config Module
 
 **Files:**
 - Modify: `package.json`
-- Create: `src/lib/stripe/config.ts`
+- Create: `src/lib/dodo/config.ts`
 
-- [ ] **Step 1: Install Stripe**
+- [ ] **Step 1: Install Dodo Payments**
 
-Run: `npm install stripe`
+Run: `npm install dodopayments`
 
-- [ ] **Step 2: Add Stripe env vars to .env.local**
+- [ ] **Step 2: Add Dodo env vars to .env.local**
 
 Add to `.env.local`:
 ```
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_FOUNDER_PRICE_ID=price_...
-STRIPE_STANDARD_PRICE_ID=price_...
+DODO_API_KEY=...
+DODO_WEBHOOK_SECRET=...
+DODO_FOUNDER_PRODUCT_ID=...
+DODO_STANDARD_PRODUCT_ID=...
 ```
 
-Note: The actual price IDs come from Stripe Dashboard after creating the Product + two Prices. Use test-mode IDs during development.
+Note: The actual product IDs come from the Dodo Payments Dashboard after creating two Products (Founder and Standard). Use test-mode keys during development.
 
-- [ ] **Step 3: Create the Stripe config module**
+- [ ] **Step 3: Create the Dodo config module**
 
-Create `src/lib/stripe/config.ts`:
+Create `src/lib/dodo/config.ts`:
 
 ```typescript
-import Stripe from 'stripe';
+import DodoPayments from 'dodopayments';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set');
+if (!process.env.DODO_API_KEY) {
+  throw new Error('DODO_API_KEY is not set');
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  // Use the API version bundled with the installed stripe package.
-  // Do NOT hardcode a version string — let the SDK default handle it.
-  typescript: true,
+export const dodo = new DodoPayments({
+  bearerToken: process.env.DODO_API_KEY,
 });
 
-export const STRIPE_CONFIG = {
-  founderPriceId: process.env.STRIPE_FOUNDER_PRICE_ID ?? '',
-  standardPriceId: process.env.STRIPE_STANDARD_PRICE_ID ?? '',
-  webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+export const DODO_CONFIG = {
+  founderProductId: process.env.DODO_FOUNDER_PRODUCT_ID ?? '',
+  standardProductId: process.env.DODO_STANDARD_PRODUCT_ID ?? '',
+  webhookSecret: process.env.DODO_WEBHOOK_SECRET ?? '',
   founderSeatsMax: 500,
 } as const;
 ```
@@ -1344,11 +1341,11 @@ export const STRIPE_CONFIG = {
 - [ ] **Step 4: Commit**
 
 ```bash
-git add package.json package-lock.json src/lib/stripe/config.ts
-git commit -m "feat: add Stripe SDK and config module
+git add package.json package-lock.json src/lib/dodo/config.ts
+git commit -m "feat: add Dodo Payments SDK and config module
 
-Single Stripe instance with config constants for founder/standard
-price IDs and webhook secret. All values from environment."
+Single Dodo client instance with config constants for founder/standard
+product IDs and webhook secret. All values from environment."
 ```
 
 ---
@@ -1356,11 +1353,11 @@ price IDs and webhook secret. All values from environment."
 ### Task 15: Create Founder Counter Module
 
 **Files:**
-- Create: `src/lib/stripe/founderCounter.ts`
+- Create: `src/lib/dodo/founderCounter.ts`
 
 - [ ] **Step 1: Implement the founder counter**
 
-Create `src/lib/stripe/founderCounter.ts`:
+Create `src/lib/dodo/founderCounter.ts`:
 
 ```typescript
 import { createClient } from '@supabase/supabase-js';
@@ -1461,7 +1458,7 @@ export async function claimFounderSeat(retries = 3): Promise<number | null> {
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/lib/stripe/founderCounter.ts
+git add src/lib/dodo/founderCounter.ts
 git commit -m "feat: add founder seat counter with atomic increment
 
 Optimistic concurrency via compare-and-swap on app_config.
@@ -1471,20 +1468,20 @@ for landing page and upgrade page."
 
 ---
 
-### Task 16: Create Stripe Checkout Route
+### Task 16: Create Dodo Checkout Route
 
 **Files:**
-- Create: `src/app/api/stripe/checkout/route.ts`
+- Create: `src/app/api/dodo/checkout/route.ts`
 
 - [ ] **Step 1: Implement checkout session creation**
 
-Create `src/app/api/stripe/checkout/route.ts`:
+Create `src/app/api/dodo/checkout/route.ts`:
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { stripe, STRIPE_CONFIG } from '@/lib/stripe/config';
-import { getFounderStatus } from '@/lib/stripe/founderCounter';
+import { dodo, DODO_CONFIG } from '@/lib/dodo/config';
+import { getFounderStatus } from '@/lib/dodo/founderCounter';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
@@ -1502,7 +1499,7 @@ export async function POST(request: NextRequest) {
   // 2. Get user from Supabase
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('id, tier, stripe_customer_id')
+    .select('id, tier, dodo_customer_id')
     .eq('clerk_id', clerkId)
     .single();
 
@@ -1515,45 +1512,41 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Already a Steward' }, { status: 400 });
   }
 
-  // 4. Determine price based on founder availability
+  // 4. Determine product based on founder availability
   const founderStatus = await getFounderStatus();
-  const priceId = founderStatus.isFounderAvailable
-    ? STRIPE_CONFIG.founderPriceId
-    : STRIPE_CONFIG.standardPriceId;
+  const productId = founderStatus.isFounderAvailable
+    ? DODO_CONFIG.founderProductId
+    : DODO_CONFIG.standardProductId;
 
-  // 5. Get or create Stripe customer
-  let customerId = user.stripe_customer_id;
+  // 5. Get or create Dodo customer
+  let customerId = user.dodo_customer_id;
   if (!customerId) {
-    const customer = await stripe.customers.create({
-      metadata: {
-        clerk_id: clerkId,
-        supabase_user_id: user.id,
-      },
+    const customer = await dodo.customers.create({
+      name: clerkId,
+      email: '', // Will be populated from Clerk if available
     });
-    customerId = customer.id;
+    customerId = customer.customer_id;
 
     await supabaseAdmin
       .from('users')
-      .update({ stripe_customer_id: customerId })
+      .update({ dodo_customer_id: customerId })
       .eq('id', user.id);
   }
 
-  // 6. Create checkout session
+  // 6. Create subscription via Dodo checkout
   const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? '';
 
-  const session = await stripe.checkout.sessions.create({
-    customer: customerId,
-    mode: 'subscription',
-    line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${origin}/world?upgraded=true`,
-    cancel_url: `${origin}/steward?canceled=true`,
+  const subscription = await dodo.subscriptions.create({
+    customer: { customer_id: customerId },
+    product_id: productId,
+    return_url: `${origin}/world?upgraded=true`,
     metadata: {
       supabase_user_id: user.id,
       is_founder: founderStatus.isFounderAvailable ? 'true' : 'false',
     },
   });
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: subscription.url });
 }
 ```
 
@@ -1565,30 +1558,32 @@ Expected: No TypeScript errors.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add src/app/api/stripe/checkout/route.ts
-git commit -m "feat: add Stripe checkout route with founder price selection
+git add src/app/api/dodo/checkout/route.ts
+git commit -m "feat: add Dodo checkout route with founder product selection
 
-Creates Checkout Session with founder or standard price based on
-seat availability. Creates Stripe customer if needed. Returns
-session URL for client redirect."
+Creates Dodo subscription with founder or standard product based on
+seat availability. Creates Dodo customer if needed. Returns
+checkout URL for client redirect."
 ```
 
 ---
 
-### Task 17: Create Stripe Webhook Handler
+### Task 17: Create Dodo Webhook Handler
 
 **Files:**
-- Create: `src/app/api/stripe/webhooks/route.ts`
+- Create: `src/app/api/dodo/webhooks/route.ts`
 
 - [ ] **Step 1: Implement webhook handler**
 
-Create `src/app/api/stripe/webhooks/route.ts`:
+Create `src/app/api/dodo/webhooks/route.ts`:
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, STRIPE_CONFIG } from '@/lib/stripe/config';
-import { claimFounderSeat } from '@/lib/stripe/founderCounter';
+import { WebhookEvent } from 'dodopayments/resources';
+import { DODO_CONFIG } from '@/lib/dodo/config';
+import { claimFounderSeat } from '@/lib/dodo/founderCounter';
 import { createClient } from '@supabase/supabase-js';
+import { Webhook } from 'standardwebhooks';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -1597,25 +1592,25 @@ const supabaseAdmin = createClient(
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
-  const signature = request.headers.get('stripe-signature');
+  const headers = Object.fromEntries(request.headers);
 
-  if (!signature) {
-    return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
-  }
-
-  let event;
+  // Verify webhook signature using standardwebhooks
+  let payload: WebhookEvent;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, STRIPE_CONFIG.webhookSecret);
+    const wh = new Webhook(DODO_CONFIG.webhookSecret);
+    payload = wh.verify(body, headers) as WebhookEvent;
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
-  switch (event.type) {
-    case 'checkout.session.completed': {
-      const session = event.data.object;
-      const userId = session.metadata?.supabase_user_id;
-      const isFounder = session.metadata?.is_founder === 'true';
+  const eventType = payload.type;
+
+  switch (eventType) {
+    case 'subscription.active': {
+      const data = payload.data;
+      const userId = data.metadata?.supabase_user_id;
+      const isFounder = data.metadata?.is_founder === 'true';
 
       if (!userId) {
         console.error('Webhook: missing supabase_user_id in metadata');
@@ -1633,7 +1628,7 @@ export async function POST(request: NextRequest) {
         .from('users')
         .update({
           tier: 'steward',
-          stripe_subscription_id: session.subscription as string,
+          dodo_subscription_id: data.subscription_id,
           subscription_status: 'active',
           ...(founderSeatNumber ? { founder_seat_number: founderSeatNumber } : {}),
         })
@@ -1643,48 +1638,35 @@ export async function POST(request: NextRequest) {
       break;
     }
 
-    case 'customer.subscription.deleted': {
-      const subscription = event.data.object;
-      const customerId = subscription.customer as string;
+    case 'subscription.cancelled': {
+      const data = payload.data;
+      const userId = data.metadata?.supabase_user_id;
 
-      // Find user by stripe_customer_id
-      const { data: user } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('stripe_customer_id', customerId)
-        .single();
-
-      if (user) {
+      if (userId) {
         await supabaseAdmin
           .from('users')
           .update({
             tier: 'traveler',
             subscription_status: 'canceled',
           })
-          .eq('id', user.id);
+          .eq('id', userId);
 
-        console.log(`User ${user.id} downgraded to traveler (subscription canceled)`);
+        console.log(`User ${userId} downgraded to traveler (subscription canceled)`);
       }
       break;
     }
 
-    case 'invoice.payment_failed': {
-      const invoice = event.data.object;
-      const customerId = invoice.customer as string;
+    case 'subscription.failed': {
+      const data = payload.data;
+      const userId = data.metadata?.supabase_user_id;
 
-      const { data: user } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('stripe_customer_id', customerId)
-        .single();
-
-      if (user) {
+      if (userId) {
         await supabaseAdmin
           .from('users')
           .update({ subscription_status: 'past_due' })
-          .eq('id', user.id);
+          .eq('id', userId);
 
-        console.log(`User ${user.id} payment failed — marked as past_due`);
+        console.log(`User ${userId} payment failed — marked as past_due`);
         // TODO post-launch: send notification email, implement 3-day grace period
       }
       break;
@@ -1692,7 +1674,7 @@ export async function POST(request: NextRequest) {
 
     default:
       // Unhandled event type — log and ignore
-      console.log(`Unhandled webhook event: ${event.type}`);
+      console.log(`Unhandled webhook event: ${eventType}`);
   }
 
   return NextResponse.json({ received: true });
@@ -1701,30 +1683,30 @@ export async function POST(request: NextRequest) {
 
 - [ ] **Step 2: Exclude webhook route from Clerk middleware**
 
-The Stripe webhook sends POST requests without Clerk auth. Update `middleware.ts` to exclude this route.
+The Dodo webhook sends POST requests without Clerk auth. Update `middleware.ts` to exclude this route.
 
-In `middleware.ts`, update the protected routes to exclude the webhook:
-```typescript
-// Add this check before the clerkMiddleware call:
-// If the path is /api/stripe/webhooks, skip Clerk auth
-```
+Verify: The middleware `config.matcher` (Line 18-24) has a catch-all `/(api|trpc)(.*)` pattern, which matches ALL API routes including `/api/dodo/webhooks`. However, the `isProtectedRoute` matcher inside `clerkMiddleware` only checks specific paths: `/api/agents(.*)` and `/api/cron(.*)`. Since `/api/dodo/webhooks` does NOT match either pattern, `auth.protect()` is never called for it. The webhook route is already safe — no changes needed. Confirm this by reading `middleware.ts` and tracing the logic.
 
-Verify: The middleware `config.matcher` (Line 18-24) has a catch-all `/(api|trpc)(.*)` pattern, which matches ALL API routes including `/api/stripe/webhooks`. However, the `isProtectedRoute` matcher inside `clerkMiddleware` only checks specific paths: `/api/agents(.*)` and `/api/cron(.*)`. Since `/api/stripe/webhooks` does NOT match either pattern, `auth.protect()` is never called for it. The webhook route is already safe — no changes needed. Confirm this by reading `middleware.ts` and tracing the logic.
+- [ ] **Step 3: Install standardwebhooks for signature verification**
 
-- [ ] **Step 3: Verify build passes**
+Run: `npm install standardwebhooks`
+
+Dodo uses the standardwebhooks library for webhook signature verification.
+
+- [ ] **Step 4: Verify build passes**
 
 Run: `npm run build`
 Expected: No TypeScript errors.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/app/api/stripe/webhooks/route.ts
-git commit -m "feat: add Stripe webhook handler for checkout, cancellation, payment failure
+git add src/app/api/dodo/webhooks/route.ts package.json package-lock.json
+git commit -m "feat: add Dodo webhook handler for subscription lifecycle
 
-Handles checkout.session.completed (→ steward + founder seat claim),
-customer.subscription.deleted (→ traveler), and invoice.payment_failed
-(→ past_due status). Signature verified."
+Handles subscription.active (→ steward + founder seat claim),
+subscription.cancelled (→ traveler), and subscription.failed
+(→ past_due status). Signature verified via standardwebhooks."
 ```
 
 ---
@@ -1732,16 +1714,18 @@ customer.subscription.deleted (→ traveler), and invoice.payment_failed
 ### Task 18: Create Customer Portal Route
 
 **Files:**
-- Create: `src/app/api/stripe/portal/route.ts`
+- Create: `src/app/api/dodo/portal/route.ts`
 
 - [ ] **Step 1: Implement portal redirect**
 
-Create `src/app/api/stripe/portal/route.ts`:
+Create `src/app/api/dodo/portal/route.ts`:
+
+Dodo Payments acts as Merchant of Record and provides a hosted customer portal for subscription management (cancel, update payment method, view invoices). The portal URL is constructed from the customer ID.
 
 ```typescript
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { stripe } from '@/lib/stripe/config';
+import { dodo } from '@/lib/dodo/config';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseAdmin = createClient(
@@ -1757,33 +1741,35 @@ export async function POST(request: NextRequest) {
 
   const { data: user } = await supabaseAdmin
     .from('users')
-    .select('stripe_customer_id')
+    .select('dodo_customer_id, dodo_subscription_id')
     .eq('clerk_id', clerkId)
     .single();
 
-  if (!user?.stripe_customer_id) {
+  if (!user?.dodo_customer_id) {
     return NextResponse.json({ error: 'No subscription found' }, { status: 404 });
   }
 
+  // Dodo provides a hosted customer portal — redirect there
+  // The customer can manage billing, cancel, and view invoices
   const origin = request.headers.get('origin') ?? process.env.NEXT_PUBLIC_APP_URL ?? '';
 
-  const session = await stripe.billingPortal.sessions.create({
-    customer: user.stripe_customer_id,
-    return_url: `${origin}/world`,
+  const portalSession = await dodo.customers.createCustomerPortal(user.dodo_customer_id, {
+    send_email: false,
   });
 
-  return NextResponse.json({ url: session.url });
+  return NextResponse.json({ url: portalSession.link });
 }
 ```
 
 - [ ] **Step 2: Commit**
 
 ```bash
-git add src/app/api/stripe/portal/route.ts
-git commit -m "feat: add Stripe Customer Portal redirect route
+git add src/app/api/dodo/portal/route.ts
+git commit -m "feat: add Dodo Customer Portal redirect route
 
-Self-serve subscription management — cancel, update payment method,
-view invoices. Zero custom UI needed."
+Self-serve subscription management via Dodo's hosted portal — cancel,
+update payment method, view invoices. Zero custom UI needed. Dodo
+handles all billing operations as Merchant of Record."
 ```
 
 ---
@@ -1799,7 +1785,7 @@ Create `src/app/api/config/founder-count/route.ts`:
 
 ```typescript
 import { NextResponse } from 'next/server';
-import { getFounderStatus } from '@/lib/stripe/founderCounter';
+import { getFounderStatus } from '@/lib/dodo/founderCounter';
 
 // In-memory cache — effective within warm serverless instances only.
 // The real caching layer is the Cache-Control header (CDN/browser cache).
@@ -1859,11 +1845,11 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 ```
 
-Note: `/api/stripe/webhooks` is intentionally NOT in this list — Stripe webhooks don't have Clerk auth.
+Note: `/api/dodo/webhooks` is intentionally NOT in this list — Dodo webhooks don't have Clerk auth.
 
 - [ ] **Step 3: Verify the webhook route is excluded**
 
-Confirm that the matcher does NOT match `/api/stripe/webhooks`. The pattern `/api/agents(.*)` won't match `/api/stripe/...`, so this is already correct.
+Confirm that the matcher does NOT match `/api/dodo/webhooks`. The pattern `/api/agents(.*)` won't match `/api/dodo/...`, so this is already correct.
 
 - [ ] **Step 4: Commit**
 
@@ -1920,7 +1906,7 @@ git add sentry.client.config.ts sentry.server.config.ts sentry.edge.config.ts ne
 git commit -m "feat: add Sentry error monitoring (free tier)
 
 Captures server + client errors. Critical for catching LLM provider
-failures, Stripe webhook issues, and heartbeat errors at launch."
+failures, Dodo webhook issues, and heartbeat errors at launch."
 ```
 
 ---
@@ -2106,7 +2092,7 @@ export default function PrivacyPage() {
       <h2>How We Use Your Data</h2>
       <p>
         Your data is used to: provide the service (running your personal world, enabling agent
-        conversations), process payments (via Stripe), improve the product (via anonymized analytics),
+        conversations), process payments (via Dodo Payments), improve the product (via anonymized analytics),
         and communicate with you about your account.
       </p>
 
@@ -2115,7 +2101,7 @@ export default function PrivacyPage() {
         <li><strong>Supabase</strong> — Database hosting (PostgreSQL)</li>
         <li><strong>Clerk</strong> — Authentication</li>
         <li><strong>Groq</strong> — AI model processing. Chat messages are sent to Groq for response generation. Groq does not train on API inputs.</li>
-        <li><strong>Stripe</strong> — Payment processing</li>
+        <li><strong>Dodo Payments</strong> — Payment processing (Merchant of Record)</li>
         <li><strong>PostHog</strong> — Product analytics</li>
         <li><strong>Sentry</strong> — Error monitoring</li>
         <li><strong>Vercel</strong> — Application hosting</li>
@@ -2193,7 +2179,7 @@ export default function TermsPage() {
       <h2>Subscriptions</h2>
       <p>
         Steward subscriptions are billed monthly. You can cancel anytime via the
-        Stripe Customer Portal. Cancellation takes effect at the end of the current
+        Dodo Payments customer portal. Cancellation takes effect at the end of the current
         billing period. No refunds for partial months.
       </p>
       <p>
@@ -2738,7 +2724,7 @@ export default function StewardPage() {
 
   const handleCheckout = async () => {
     analytics.checkoutStarted('steward');
-    const res = await fetch('/api/stripe/checkout', { method: 'POST' });
+    const res = await fetch('/api/dodo/checkout', { method: 'POST' });
     const data = await res.json();
     if (data.url) {
       window.location.href = data.url;
@@ -2796,7 +2782,7 @@ export default function StewardPage() {
 git add src/app/steward/page.tsx
 git commit -m "feat: add /steward upgrade page with checkout flow
 
-Three-bullet value prop, Stripe Checkout redirect, founder counter,
+Three-bullet value prop, Dodo Payments checkout redirect, founder counter,
 cancel/refund disclaimer. Analytics tracking on page view and checkout start."
 ```
 
@@ -3180,11 +3166,11 @@ Test each step sequentially:
 6. Send chat message → receive response
 7. Send 10 messages → quota message appears with narrative text
 8. Click "Become a Steward" → upgrade page at `/steward`
-9. Click checkout → Stripe Checkout page loads (use test card 4242424242424242)
+9. Click checkout → Dodo Payments checkout page loads (use test card from Dodo test mode)
 10. Complete payment → return to `/world?upgraded=true`
 11. Verify: can now send 50 messages, can create a custom agent
 12. Create custom agent → agent appears in settlement
-13. Visit `/api/stripe/portal` → Stripe portal loads
+13. Visit `/api/dodo/portal` → Dodo customer portal loads
 14. Cancel subscription → tier reverts to traveler
 
 - [ ] **Step 2: Mobile responsiveness test**
@@ -3197,7 +3183,7 @@ Test: what happens at seat 499, 500, 501? Verify the counter switches prices cor
 
 - [ ] **Step 4: Error state testing**
 
-Test: what if Groq is down? Does the fallback work? What if Stripe webhook fails?
+Test: what if Groq is down? Does the fallback work? What if Dodo webhook fails?
 
 ---
 
@@ -3268,16 +3254,17 @@ Go to Upstash dashboard → rotate signing keys. Update `.env.local` with new va
 Run: `git log --all --full-history -S "gsk_" -- .`
 Expected: No matches. If found, the key was committed at some point — rotate it and update.
 
-- [ ] **Step 4: Switch Stripe to live mode**
+- [ ] **Step 4: Switch Dodo Payments to live mode**
 
 Update `.env.local`:
 ```
-STRIPE_SECRET_KEY=sk_live_...
-STRIPE_WEBHOOK_SECRET=whsec_live_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
+DODO_API_KEY=<live_api_key>
+DODO_WEBHOOK_SECRET=<live_webhook_secret>
+DODO_FOUNDER_PRODUCT_ID=<live_founder_product_id>
+DODO_STANDARD_PRODUCT_ID=<live_standard_product_id>
 ```
 
-Create the live Product + Prices in Stripe Dashboard.
+Create the live Products in Dodo Payments Dashboard (Founder + Standard).
 Set up the live webhook endpoint pointing to your production URL.
 
 - [ ] **Step 5: Final deploy**
@@ -3316,8 +3303,8 @@ Task 9  (Usage quota module) → Task 8
 Task 10 (Quota in chat route) → Tasks 6, 9
 Task 11 (Rate limiter) → no dependencies
 Task 12 (Adaptive heartbeat) → Task 3
-Task 13 (DB migrations: Stripe + tier) → no dependencies
-Task 14 (Stripe config) → no dependencies
+Task 13 (DB migrations: Dodo + tier) → no dependencies
+Task 14 (Dodo config) → no dependencies
 Task 15 (Founder counter) → Task 8
 Task 16 (Checkout route) → Tasks 14, 15
 Task 17 (Webhook handler) → Tasks 14, 15
@@ -3341,6 +3328,6 @@ Task 33 (Secret rotation) → no dependencies
 
 **Parallelizable groups (for subagent-driven development):**
 - Group A: Tasks 1, 2 (provider layer)
-- Group B: Tasks 8, 11, 13, 14 (DB + deps with no code dependencies)
+- Group B: Tasks 8, 11, 13, 14 (DB + Dodo deps with no code dependencies)
 - Group C: Tasks 20, 21, 22, 23 (independent infrastructure)
 - Group D: Tasks 29, 31, 32 (independent prep work)
