@@ -1,6 +1,5 @@
 // src/lib/ai/provider.ts
 // Thin LLM provider abstraction — all agent features call this interface.
-// Start on Gemini, swap per-agent to OpenRouter/DeepSeek later without code changes.
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -29,7 +28,7 @@ export interface LLMProvider {
 
 // Lazy imports to avoid loading unused provider SDKs
 export function createProvider(
-  provider: 'gemini' | 'openrouter' | 'deepseek' | 'groq',
+  provider: 'gemini' | 'openrouter' | 'groq',
   apiKey: string
 ): LLMProvider {
   switch (provider) {
@@ -45,8 +44,6 @@ export function createProvider(
       const { GroqProvider } = require('./groq');
       return new GroqProvider(apiKey);
     }
-    case 'deepseek':
-      throw new Error('DeepSeek provider not yet implemented');
     default:
       throw new Error(`Unknown provider: ${provider}`);
   }

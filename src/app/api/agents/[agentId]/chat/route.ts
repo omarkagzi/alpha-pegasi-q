@@ -19,8 +19,6 @@ function getApiKey(provider: string): string {
       return process.env.GROQ_API_KEY ?? '';
     case 'openrouter':
       return process.env.OPENROUTER_API_KEY ?? '';
-    case 'deepseek':
-      return process.env.DEEPSEEK_API_KEY ?? '';
     case 'gemini':
     default:
       return process.env.GEMINI_API_KEY ?? '';
@@ -265,7 +263,7 @@ export async function POST(
       { status: 503 }
     );
   }
-  const providerType = contextResult.agent.provider as 'gemini' | 'openrouter' | 'deepseek' | 'groq';
+  const providerType = contextResult.agent.provider as 'gemini' | 'openrouter' | 'groq';
   let reply: string;
 
   const callLLM = async () => {
