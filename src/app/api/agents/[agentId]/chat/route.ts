@@ -28,7 +28,6 @@ interface ChatRequestBody {
 // Themed error messages
 const ERRORS = {
   unauthenticated: 'Sign in to speak with the people of Arboria.',
-  visitor_tier: "The people of Arboria would love to talk, but you'll need an Explorer account first.",
   agent_not_found: 'This agent seems to have wandered off.',
   timeout: (name: string) => `${name} seems lost in thought... try again in a moment.`,
   rate_limit: 'The settlement is busy right now. Try again shortly.',
@@ -70,10 +69,10 @@ export async function POST(
     .single();
 
   if (!user) {
-    // First interaction: create the user record with 'explorer' tier
+    // First interaction: create the user record with 'traveler' tier
     const { data: newUser, error: insertErr } = await supabase
       .from('users')
-      .insert({ clerk_id: clerkId, tier: 'explorer' })
+      .insert({ clerk_id: clerkId, tier: 'traveler' })
       .select('id, tier')
       .single();
 
@@ -87,14 +86,8 @@ export async function POST(
     user = newUser;
   }
 
-  // Check tier — visitors cannot chat
-  if (user.tier === 'visitor') {
-    return NextResponse.json(
-      { error: ERRORS.visitor_tier },
-      { status: 403 }
-    );
-  }
-
+  // Tier mapping: post-migration all non-steward users are travelers.
+  // Quota enforcement for travelers is handled by checkAndIncrementQuota below.
   const userTier: Tier = (user.tier === 'steward') ? 'steward' : 'traveler';
 
   // ── Step 2: Parse Request ──
