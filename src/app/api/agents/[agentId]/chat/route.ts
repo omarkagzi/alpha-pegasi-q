@@ -190,25 +190,21 @@ export async function POST(
   }
 
   // ── Step 4b: Quota Enforcement (before any LLM call) ──
+  // DEV: Quota check commented out for testing — re-enable before production launch
+  // const quotaResult = await checkAndIncrementQuota(user.id, userTier, agentName);
+  // if (!quotaResult.allowed) {
+  //   return NextResponse.json({
+  //     session_id: sessionId ?? null,
+  //     reply: null,
+  //     agent_name: agentName,
+  //     sentiment: null,
+  //     quota_exceeded: true,
+  //     narrative_message: quotaResult.narrativeMessage,
+  //     turns_used: quotaResult.turnsUsed,
+  //     turns_limit: quotaResult.turnsLimit,
+  //   });
+  // }
   const agentName = contextResult.agent.name;
-  const quotaResult = await checkAndIncrementQuota(
-    user.id,
-    userTier,
-    agentName
-  );
-
-  if (!quotaResult.allowed) {
-    return NextResponse.json({
-      session_id: sessionId ?? null,
-      reply: null,
-      agent_name: agentName,
-      sentiment: null,
-      quota_exceeded: true,
-      narrative_message: quotaResult.narrativeMessage,
-      turns_used: quotaResult.turnsUsed,
-      turns_limit: quotaResult.turnsLimit,
-    });
-  }
 
   // ── Step 5: Build LLM Messages ──
   const llmMessages: ChatMessage[] = [
