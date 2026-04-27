@@ -91,12 +91,15 @@ export async function POST(
   const userTier: Tier = (user.tier === 'steward') ? 'steward' : 'traveler';
 
   // Update last_login so the adaptive heartbeat sees this user as active.
-  // last_login defaults to created_at and is never otherwise updated — without this,
-  // the heartbeat treats all users as dormant after their first day and drops to
-  // traveler-only 30-minute cadence even when a steward is actively using the app.
-  void Promise.resolve(
-    supabase.from('users').update({ last_login: new Date().toISOString() }).eq('id', user.id)
-  ).catch((err) => console.error('[Chat] Failed to update last_login:', err));
+  // Fire-and-forget — don't await, but surface PostgREST errors so silent failures
+  // don't put the heartbeat back into dormant mode.
+  supabase
+    .from('users')
+    .update({ last_login: new Date().toISOString() })
+    .eq('id', user.id)
+    .then(({ error }) => {
+      if (error) console.error('[Chat] Failed to update last_login:', error.message);
+    });
 
   // ── Step 2: Parse Request ──
   let body: ChatRequestBody;

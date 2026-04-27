@@ -10,7 +10,12 @@
       "Bash(npm run *)",
       "mcp__56d4e176-035f-4f66-a7fd-bb4a8a1f47e1__execute_sql",
       "mcp__56d4e176-035f-4f66-a7fd-bb4a8a1f47e1__list_migrations",
-      "Bash(npm test *)"
+      "Bash(npm test *)",
+      "mcp__56d4e176-035f-4f66-a7fd-bb4a8a1f47e1__list_projects",
+      "mcp__856d2209-941e-4a3e-a403-40465f544d7d__list_teams",
+      "mcp__856d2209-941e-4a3e-a403-40465f544d7d__list_projects",
+      "mcp__856d2209-941e-4a3e-a403-40465f544d7d__get_runtime_logs",
+      "Bash(npx vitest *)"
     ]
   }
 }
