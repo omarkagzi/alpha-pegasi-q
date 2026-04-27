@@ -75,35 +75,25 @@ async function verifyRequest(req: Request): Promise<boolean> {
 
 // ── Step 6: Narrator LLM call ──
 
-async function callNarrator(
-  prompt: string,
-  repromptHint?: string,
-): Promise<GeneratedEvent[]> {
-  const narratorPolicy = choosePolicy('heartbeat', 'steward');
-  const provider = createProvider(narratorPolicy.provider, getProviderApiKey(narratorPolicy.provider));
-  const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
-
-  if (repromptHint) {
-    messages.push({ role: 'user', content: repromptHint });
-  }
-
-  const result = await provider.chat(messages, {
-    ...policyToLlmOptions(narratorPolicy),
-  });
-
-  // Parse the JSON response — handle both array and single object
+function parseNarratorResponse(raw: string, label: string): GeneratedEvent[] {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(result.content);
+    parsed = JSON.parse(raw);
   } catch {
-    console.error('[Heartbeat] Failed to parse narrator response:', result.content);
+    console.error(`[Heartbeat] Failed to parse narrator response (${label}):`, raw.slice(0, 500));
     return [];
+  }
+
+  // Some providers wrap arrays in {events: [...]} or {result: [...]}; unwrap defensively.
+  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const obj = parsed as Record<string, unknown>;
+    if (Array.isArray(obj.events)) parsed = obj.events;
+    else if (Array.isArray(obj.result)) parsed = obj.result;
   }
 
   const events = Array.isArray(parsed) ? parsed : [parsed];
 
-  // Validate each event has required fields
-  return events.filter(
+  const valid = events.filter(
     (e): e is GeneratedEvent =>
       typeof e === 'object' &&
       e !== null &&
@@ -112,6 +102,66 @@ async function callNarrator(
       Array.isArray((e as Record<string, unknown>).involved_agents) &&
       typeof (e as Record<string, unknown>).description === 'string',
   ) as GeneratedEvent[];
+
+  if (events.length > 0 && valid.length === 0) {
+    console.warn(
+      `[Heartbeat] Narrator returned ${events.length} item(s) but none passed schema validation (${label}). First item:`,
+      JSON.stringify(events[0]).slice(0, 300),
+    );
+  }
+
+  return valid;
+}
+
+async function callNarrator(
+  prompt: string,
+  repromptHint?: string,
+): Promise<GeneratedEvent[]> {
+  const narratorPolicy = choosePolicy('heartbeat', 'steward');
+  const messages: ChatMessage[] = [{ role: 'user', content: prompt }];
+  if (repromptHint) {
+    messages.push({ role: 'user', content: repromptHint });
+  }
+  const llmOptions = policyToLlmOptions(narratorPolicy);
+
+  // Try primary provider (groq), then fall back to gemini on any error or empty result.
+  // Gemini fallback is critical: groq's free tier hits a daily token cap that silently
+  // breaks the heartbeat. Without this fallback, the world freezes for hours.
+  const primaryKey = getProviderApiKey(narratorPolicy.provider);
+  if (primaryKey) {
+    try {
+      const provider = createProvider(narratorPolicy.provider, primaryKey);
+      const result = await provider.chat(messages, llmOptions);
+      const events = parseNarratorResponse(result.content, narratorPolicy.provider);
+      if (events.length > 0) return events;
+      console.warn(`[Heartbeat] Narrator (${narratorPolicy.provider}) returned 0 valid events — trying fallback`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[Heartbeat] Narrator primary (${narratorPolicy.provider}) failed:`, msg);
+    }
+  } else {
+    console.warn(`[Heartbeat] No API key for primary provider ${narratorPolicy.provider}`);
+  }
+
+  const fallbackKey = getProviderApiKey(narratorPolicy.fallbackProvider);
+  if (!fallbackKey) {
+    console.error(`[Heartbeat] No API key for fallback provider ${narratorPolicy.fallbackProvider} — giving up`);
+    return [];
+  }
+
+  try {
+    const fallback = createProvider(narratorPolicy.fallbackProvider, fallbackKey);
+    const result = await fallback.chat(messages, { ...llmOptions, model: narratorPolicy.fallbackModel });
+    const events = parseNarratorResponse(result.content, narratorPolicy.fallbackProvider);
+    if (events.length === 0) {
+      console.warn(`[Heartbeat] Fallback (${narratorPolicy.fallbackProvider}) also returned 0 valid events`);
+    }
+    return events;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[Heartbeat] Narrator fallback (${narratorPolicy.fallbackProvider}) failed:`, msg);
+    return [];
+  }
 }
 
 // ── UUID Resolution Fallback ──
@@ -160,7 +210,24 @@ async function runBeliefUpdate(
   if (!agents || agents.length === 0) return;
 
   const beliefPolicy = choosePolicy('heartbeat', 'steward');
-  const provider = createProvider(beliefPolicy.provider, getProviderApiKey(beliefPolicy.provider));
+
+  // Helper: try primary provider, then fall back to gemini on any error
+  const callBeliefLLM = async (messages: ChatMessage[]) => {
+    const primaryKey = getProviderApiKey(beliefPolicy.provider);
+    if (primaryKey) {
+      try {
+        const provider = createProvider(beliefPolicy.provider, primaryKey);
+        return await provider.chat(messages, { ...policyToLlmOptions(beliefPolicy) });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Heartbeat] Belief LLM primary (${beliefPolicy.provider}) failed: ${msg} — trying fallback`);
+      }
+    }
+    const fallbackKey = getProviderApiKey(beliefPolicy.fallbackProvider);
+    if (!fallbackKey) throw new Error(`No API key for fallback ${beliefPolicy.fallbackProvider}`);
+    const fallback = createProvider(beliefPolicy.fallbackProvider, fallbackKey);
+    return fallback.chat(messages, { ...policyToLlmOptions(beliefPolicy), model: beliefPolicy.fallbackModel });
+  };
 
   for (const agent of agents) {
     try {
@@ -230,10 +297,7 @@ async function runBeliefUpdate(
       };
 
       const prompt = buildBeliefUpdatePrompt(beliefCtx);
-      const result = await provider.chat(
-        [{ role: 'user', content: prompt }],
-        { ...policyToLlmOptions(beliefPolicy) },
-      );
+      const result = await callBeliefLLM([{ role: 'user', content: prompt }]);
 
       let updatedBeliefs: Record<string, string>;
       try {
@@ -296,31 +360,49 @@ async function handleHeartbeat(request: NextRequest) {
   // - Reduce cadence when only free-tier users are active (saves ~80% of LLM cost)
   // - Full cadence when any Steward is active
 
-  const { data: activeUsers } = await supabase
-    .from('users')
-    .select('id, tier, last_login')
-    .not('last_login', 'is', null);
-
-  if (!activeUsers || activeUsers.length === 0) {
-    return NextResponse.json({
-      events: [],
-      meta: { skipped: true, reason: 'no_active_users' },
-    });
-  }
-
   const now = new Date();
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const sevenDaysAgo = new Date(now.getTime() - SEVEN_DAYS_MS).toISOString();
 
-  const hasActiveSteward = activeUsers.some((u) => {
-    const timeSinceLogin = now.getTime() - new Date(u.last_login).getTime();
-    return u.tier === 'steward' && timeSinceLogin < SEVEN_DAYS_MS;
-  });
+  // Activity signal = MAX(last_login, most recent conversation_session.updated_at).
+  // last_login alone misses users who chat without re-authenticating (the chat
+  // route updates it now, but pre-existing rows can be stale). Pulling session
+  // activity gives a richer "is anyone actually using the world" signal.
+  const [{ data: usersData }, { data: recentSessions }] = await Promise.all([
+    supabase.from('users').select('id, tier, last_login'),
+    supabase
+      .from('conversation_sessions')
+      .select('user_id, updated_at')
+      .gte('updated_at', sevenDaysAgo),
+  ]);
 
-  const hasActiveTraveler = activeUsers.some((u) => {
-    const timeSinceLogin = now.getTime() - new Date(u.last_login).getTime();
-    return u.tier !== 'steward' && timeSinceLogin < THREE_DAYS_MS;
-  });
+  if (!usersData || usersData.length === 0) {
+    return NextResponse.json({
+      events: [],
+      meta: { skipped: true, reason: 'no_users' },
+    });
+  }
+
+  const lastSessionByUser = new Map<string, number>();
+  for (const s of recentSessions ?? []) {
+    const prev = lastSessionByUser.get(s.user_id) ?? 0;
+    const t = new Date(s.updated_at).getTime();
+    if (t > prev) lastSessionByUser.set(s.user_id, t);
+  }
+
+  const lastSeenMs = (u: { id: string; last_login: string | null }) => {
+    const loginMs = u.last_login ? new Date(u.last_login).getTime() : 0;
+    const sessionMs = lastSessionByUser.get(u.id) ?? 0;
+    return Math.max(loginMs, sessionMs);
+  };
+
+  const hasActiveSteward = usersData.some(
+    (u) => u.tier === 'steward' && now.getTime() - lastSeenMs(u) < SEVEN_DAYS_MS,
+  );
+  const hasActiveTraveler = usersData.some(
+    (u) => u.tier !== 'steward' && now.getTime() - lastSeenMs(u) < THREE_DAYS_MS,
+  );
 
   if (!hasActiveSteward && !hasActiveTraveler) {
     return NextResponse.json({
@@ -467,13 +549,20 @@ async function handleHeartbeat(request: NextRequest) {
     };
 
     const narratorPrompt = buildNarratorPrompt(narratorCtx);
-    let generatedEvents = await callNarrator(narratorPrompt);
+    const narratorRaw = await callNarrator(narratorPrompt);
+    console.log(`[Heartbeat] Narrator returned ${narratorRaw.length} raw events`);
 
     // Resolve any agent names to UUIDs
-    generatedEvents = resolveAgentIds(generatedEvents, agentRoster);
+    const resolved = resolveAgentIds(narratorRaw, agentRoster);
 
-    // Filter out events with no valid agents
-    generatedEvents = generatedEvents.filter((e) => e.involved_agents.length > 0);
+    // Filter out events with no valid agents — log if this drops anything
+    const generatedEvents = resolved.filter((e) => e.involved_agents.length > 0);
+    if (resolved.length > generatedEvents.length) {
+      console.warn(
+        `[Heartbeat] Dropped ${resolved.length - generatedEvents.length} event(s) with unresolved agents. Roster: ${agentRoster.map((a) => a.name).join(',')}. First dropped:`,
+        JSON.stringify(resolved.find((e) => e.involved_agents.length === 0))?.slice(0, 300),
+      );
+    }
 
     // ── Step 7: Deduplicate ──
     const { data: last20Events } = await supabase
@@ -489,14 +578,23 @@ async function handleHeartbeat(request: NextRequest) {
     }));
 
     let finalEvents = deduplicateEvents(generatedEvents, recentForDedup);
+    if (generatedEvents.length > finalEvents.length) {
+      console.warn(`[Heartbeat] Dedup removed ${generatedEvents.length - finalEvents.length} of ${generatedEvents.length} event(s)`);
+    }
 
-    // Re-prompt once if all events were rejected
-    if (finalEvents.length === 0 && generatedEvents.length > 0) {
-      console.log('[Heartbeat] All events deduplicated — re-prompting');
+    // Re-prompt once if we ended up with nothing — covers BOTH "all dedup'd" and
+    // "narrator returned empty" cases. Previously only fired on the dedup path,
+    // which let parse-failures and empty narrator outputs slip through silently.
+    if (finalEvents.length === 0) {
+      console.log('[Heartbeat] Zero events after dedup — re-prompting');
       const retryEvents = await callNarrator(narratorPrompt, buildRepromptInstruction());
+      console.log(`[Heartbeat] Re-prompt returned ${retryEvents.length} raw events`);
       const resolvedRetry = resolveAgentIds(retryEvents, agentRoster)
         .filter((e) => e.involved_agents.length > 0);
       finalEvents = deduplicateEvents(resolvedRetry, recentForDedup);
+      if (finalEvents.length === 0) {
+        console.warn('[Heartbeat] Re-prompt also produced 0 final events');
+      }
     }
 
     if (finalEvents.length === 0) {
