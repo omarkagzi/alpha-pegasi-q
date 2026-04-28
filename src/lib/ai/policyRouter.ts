@@ -25,7 +25,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.7,
       responseFormat: 'text',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
     steward: {
       provider: 'groq',
@@ -34,7 +34,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.7,
       responseFormat: 'text',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
   },
   heartbeat: {
@@ -45,7 +45,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.8,
       responseFormat: 'json',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
     steward: {
       provider: 'groq',
@@ -54,7 +54,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.8,
       responseFormat: 'json',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
   },
   journal: {
@@ -65,7 +65,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.7,
       responseFormat: 'text',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
     steward: {
       provider: 'groq',
@@ -74,7 +74,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.7,
       responseFormat: 'text',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
   },
   summary: {
@@ -85,7 +85,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.3,
       responseFormat: 'text',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
     steward: {
       provider: 'groq',
@@ -94,7 +94,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.3,
       responseFormat: 'text',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
   },
   sentiment: {
@@ -105,7 +105,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.1,
       responseFormat: 'json',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
     steward: {
       provider: 'groq',
@@ -114,7 +114,7 @@ const POLICY_TABLE: Record<Feature, Record<Tier, LlmPolicy>> = {
       temperature: 0.1,
       responseFormat: 'json',
       fallbackProvider: 'gemini',
-      fallbackModel: 'gemini-2.0-flash',
+      fallbackModel: 'gemini-1.5-flash',
     },
   },
 };

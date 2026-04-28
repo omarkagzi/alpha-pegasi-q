@@ -34,7 +34,7 @@ describe('choosePolicy', () => {
     it('includes gemini fallback for all policies', () => {
       const policy = choosePolicy('chat', 'traveler');
       expect(policy.fallbackProvider).toBe('gemini');
-      expect(policy.fallbackModel).toBe('gemini-2.0-flash');
+      expect(policy.fallbackModel).toBe('gemini-1.5-flash');
     });
   });
 

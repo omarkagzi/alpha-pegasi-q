@@ -211,22 +211,30 @@ async function runBeliefUpdate(
 
   const beliefPolicy = choosePolicy('heartbeat', 'steward');
 
-  // Helper: try primary provider, then fall back to gemini on any error
+  // Beliefs intentionally invert the policy's primary/fallback ordering:
+  // try GEMINI first, fall back to GROQ. Why: the narrator runs on Groq and
+  // belief updates fire concurrently in the same minute as a downstream
+  // heartbeat, eating Groq's 6000 TPM budget and 429-ing the narrator
+  // (observed in production 2026-04-27). Splitting providers gives beliefs
+  // their own rate-limit bucket so they can't starve the narrator.
   const callBeliefLLM = async (messages: ChatMessage[]) => {
-    const primaryKey = getProviderApiKey(beliefPolicy.provider);
-    if (primaryKey) {
+    const geminiKey = getProviderApiKey(beliefPolicy.fallbackProvider); // 'gemini'
+    if (geminiKey) {
       try {
-        const provider = createProvider(beliefPolicy.provider, primaryKey);
-        return await provider.chat(messages, { ...policyToLlmOptions(beliefPolicy) });
+        const provider = createProvider(beliefPolicy.fallbackProvider, geminiKey);
+        return await provider.chat(messages, {
+          ...policyToLlmOptions(beliefPolicy),
+          model: beliefPolicy.fallbackModel,
+        });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[Heartbeat] Belief LLM primary (${beliefPolicy.provider}) failed: ${msg} — trying fallback`);
+        console.warn(`[Heartbeat] Belief LLM gemini failed: ${msg} — trying groq`);
       }
     }
-    const fallbackKey = getProviderApiKey(beliefPolicy.fallbackProvider);
-    if (!fallbackKey) throw new Error(`No API key for fallback ${beliefPolicy.fallbackProvider}`);
-    const fallback = createProvider(beliefPolicy.fallbackProvider, fallbackKey);
-    return fallback.chat(messages, { ...policyToLlmOptions(beliefPolicy), model: beliefPolicy.fallbackModel });
+    const groqKey = getProviderApiKey(beliefPolicy.provider); // 'groq'
+    if (!groqKey) throw new Error('No API key for groq fallback on belief update');
+    const groq = createProvider(beliefPolicy.provider, groqKey);
+    return groq.chat(messages, { ...policyToLlmOptions(beliefPolicy) });
   };
 
   for (const agent of agents) {
@@ -681,7 +689,7 @@ async function handleHeartbeat(request: NextRequest) {
     }
 
     // ── Step 10: Belief update (every 4th heartbeat) ──
-    if (timeInfo.heartbeat_count % 4 === 0) {
+    if (timeInfo.heartbeat_count % 8 === 0) {
       // Run async — don't block the response
       runBeliefUpdate(supabase).catch((err) =>
         console.error('[Heartbeat] Belief update error:', err),
@@ -698,7 +706,7 @@ async function handleHeartbeat(request: NextRequest) {
         agents_selected: selectedAgents.map((a) => a.name),
         categories_required: required,
         pressures_active: activePressures.map((p) => p.id),
-        belief_update: timeInfo.heartbeat_count % 4 === 0,
+        belief_update: timeInfo.heartbeat_count % 8 === 0,
       },
     });
   } catch (err) {
