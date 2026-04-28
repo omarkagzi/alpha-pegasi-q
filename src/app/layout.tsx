@@ -1,6 +1,7 @@
 import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from "next";
 import { PostHogProvider } from '@/components/providers/PostHogProvider';
+import { CookieConsent } from '@/components/shared/CookieConsent';
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
         >
           <PostHogProvider>
             {children}
+            <CookieConsent />
           </PostHogProvider>
         </body>
       </html>
