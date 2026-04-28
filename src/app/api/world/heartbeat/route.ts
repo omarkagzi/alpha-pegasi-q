@@ -164,6 +164,58 @@ async function callNarrator(
   }
 }
 
+// ── Schema Normalization ──
+
+// Must match the CHECK constraints in 0009_agent_events.sql.
+const VALID_EVENT_TYPES = ['conversation', 'activity', 'observation', 'trade', 'reaction'] as const;
+const VALID_EVENT_CATEGORIES = ['social', 'craft', 'observation', 'errand', 'reflection', 'tension', 'milestone'] as const;
+type ValidEventType = (typeof VALID_EVENT_TYPES)[number];
+type ValidEventCategory = (typeof VALID_EVENT_CATEGORIES)[number];
+
+// When the LLM puts a category value into event_type (common with smaller models),
+// map it to the closest legal type. This is the same mapping the narrator prompt
+// implies — e.g. 'social' interactions are 'conversation' events.
+const CATEGORY_TO_TYPE: Record<ValidEventCategory, ValidEventType> = {
+  social: 'conversation',
+  craft: 'activity',
+  errand: 'activity',
+  reflection: 'observation',
+  observation: 'observation',
+  tension: 'reaction',
+  milestone: 'activity',
+};
+
+function normalizeEventFields(e: GeneratedEvent): GeneratedEvent {
+  const rawType = (e.event_type || '').toLowerCase();
+  const rawCat = (e.event_category || '').toLowerCase();
+
+  let type: ValidEventType;
+  if ((VALID_EVENT_TYPES as readonly string[]).includes(rawType)) {
+    type = rawType as ValidEventType;
+  } else if ((VALID_EVENT_CATEGORIES as readonly string[]).includes(rawType)) {
+    // LLM put a category in the type slot — coerce to the implied type
+    type = CATEGORY_TO_TYPE[rawType as ValidEventCategory];
+    console.warn(`[Heartbeat] Coerced event_type '${rawType}' → '${type}'`);
+  } else {
+    type = 'activity';
+    console.warn(`[Heartbeat] Unknown event_type '${rawType}' → defaulted to 'activity'`);
+  }
+
+  let category: ValidEventCategory;
+  if ((VALID_EVENT_CATEGORIES as readonly string[]).includes(rawCat)) {
+    category = rawCat as ValidEventCategory;
+  } else if ((VALID_EVENT_TYPES as readonly string[]).includes(rawCat)) {
+    // LLM put a type in the category slot — pick a sensible category
+    category = rawCat === 'conversation' ? 'social' : 'errand';
+    console.warn(`[Heartbeat] Coerced event_category '${rawCat}' → '${category}'`);
+  } else {
+    category = 'errand';
+    console.warn(`[Heartbeat] Unknown event_category '${rawCat}' → defaulted to 'errand'`);
+  }
+
+  return { ...e, event_type: type, event_category: category };
+}
+
 // ── UUID Resolution Fallback ──
 
 /**
@@ -560,8 +612,12 @@ async function handleHeartbeat(request: NextRequest) {
     const narratorRaw = await callNarrator(narratorPrompt);
     console.log(`[Heartbeat] Narrator returned ${narratorRaw.length} raw events`);
 
+    // Normalize event_type / event_category before anything else — small models
+    // routinely swap these or invent values that violate the DB CHECK constraint.
+    const normalized = narratorRaw.map(normalizeEventFields);
+
     // Resolve any agent names to UUIDs
-    const resolved = resolveAgentIds(narratorRaw, agentRoster);
+    const resolved = resolveAgentIds(normalized, agentRoster);
 
     // Filter out events with no valid agents — log if this drops anything
     const generatedEvents = resolved.filter((e) => e.involved_agents.length > 0);
@@ -597,7 +653,7 @@ async function handleHeartbeat(request: NextRequest) {
       console.log('[Heartbeat] Zero events after dedup — re-prompting');
       const retryEvents = await callNarrator(narratorPrompt, buildRepromptInstruction());
       console.log(`[Heartbeat] Re-prompt returned ${retryEvents.length} raw events`);
-      const resolvedRetry = resolveAgentIds(retryEvents, agentRoster)
+      const resolvedRetry = resolveAgentIds(retryEvents.map(normalizeEventFields), agentRoster)
         .filter((e) => e.involved_agents.length > 0);
       finalEvents = deduplicateEvents(resolvedRetry, recentForDedup);
       if (finalEvents.length === 0) {
