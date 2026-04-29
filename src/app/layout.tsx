@@ -2,8 +2,7 @@ import { ClerkProvider } from '@clerk/nextjs'
 import type { Metadata } from "next";
 import { PostHogProvider } from '@/components/providers/PostHogProvider';
 import { CookieConsent } from '@/components/shared/CookieConsent';
-import { Geist, Geist_Mono } from "next/font/google";
-import { IBM_Plex_Sans, IBM_Plex_Mono, Bebas_Neue } from "next/font/google"
+import { Geist, Geist_Mono, IBM_Plex_Sans, IBM_Plex_Mono, Bebas_Neue } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
