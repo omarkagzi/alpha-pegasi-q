@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --background: #ffffff;
@@ -55,4 +58,87 @@ body {
 
 .animate-slide-in-right {
   animation: slide-in-right 0.25s ease-out;
+}
+
+/* ── Landing Page Design Tokens ── */
+:root {
+  --lp-background: oklch(0.08 0 0);
+  --lp-foreground: oklch(0.95 0 0);
+  --lp-card: oklch(0.12 0 0);
+  --lp-card-foreground: oklch(0.95 0 0);
+  --lp-popover: oklch(0.1 0 0);
+  --lp-popover-foreground: oklch(0.95 0 0);
+  --lp-primary: oklch(0.95 0 0);
+  --lp-primary-foreground: oklch(0.08 0 0);
+  --lp-secondary: oklch(0.18 0 0);
+  --lp-secondary-foreground: oklch(0.85 0 0);
+  --lp-muted: oklch(0.25 0 0);
+  --lp-muted-foreground: oklch(0.55 0 0);
+  --lp-accent: oklch(0.7 0.2 45);
+  --lp-accent-foreground: oklch(0.08 0 0);
+  --lp-destructive: oklch(0.577 0.245 27.325);
+  --lp-border: oklch(0.25 0 0);
+  --lp-input: oklch(0.2 0 0);
+  --lp-ring: oklch(0.7 0.2 45);
+  --lp-radius: 0rem;
+}
+
+@theme inline {
+  --font-display: "Bebas Neue", "Bebas Neue Fallback", sans-serif;
+  --color-lp-background: var(--lp-background);
+  --color-lp-foreground: var(--lp-foreground);
+  --color-lp-accent: var(--lp-accent);
+  --color-lp-border: var(--lp-border);
+  --color-lp-muted: var(--lp-muted);
+  --color-lp-muted-foreground: var(--lp-muted-foreground);
+}
+
+/* Noise texture overlay (landing page) */
+.noise-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* Grid background (landing page) */
+.grid-bg {
+  background-image: linear-gradient(to right, oklch(0.2 0 0) 1px, transparent 1px),
+    linear-gradient(to bottom, oklch(0.2 0 0) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* Custom selection */
+::selection {
+  background: oklch(0.7 0.2 45);
+  color: oklch(0.08 0 0);
+}
+
+/* Token overrides scoped to landing page — prevents clashing with game/auth styles */
+.landing-page {
+  --background: oklch(0.08 0 0);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.12 0 0);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.1 0 0);
+  --popover-foreground: oklch(0.95 0 0);
+  --primary: oklch(0.95 0 0);
+  --primary-foreground: oklch(0.08 0 0);
+  --secondary: oklch(0.18 0 0);
+  --secondary-foreground: oklch(0.85 0 0);
+  --muted: oklch(0.25 0 0);
+  --muted-foreground: oklch(0.55 0 0);
+  --accent: oklch(0.7 0.2 45);
+  --accent-foreground: oklch(0.08 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --border: oklch(0.25 0 0);
+  --input: oklch(0.2 0 0);
+  --ring: oklch(0.7 0.2 45);
+  --radius: 0rem;
 }
