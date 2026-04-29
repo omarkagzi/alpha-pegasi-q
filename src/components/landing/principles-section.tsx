@@ -1,7 +1,7 @@
 "use client"
 
 import { useRef, useEffect } from "react"
-import { HighlightText } from "@/components/highlight-text"
+import { HighlightText } from "@/components/landing/highlight-text"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 

@@ -1,10 +1,10 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import { ScrambleTextOnHover } from "@/components/scramble-text"
-import { SplitFlapText, SplitFlapMuteToggle, SplitFlapAudioProvider } from "@/components/split-flap-text"
-import { AnimatedNoise } from "@/components/animated-noise"
-import { BitmapChevron } from "@/components/bitmap-chevron"
+import { ScrambleTextOnHover } from "@/components/landing/scramble-text"
+import { SplitFlapText, SplitFlapMuteToggle, SplitFlapAudioProvider } from "@/components/landing/split-flap-text"
+import { AnimatedNoise } from "@/components/landing/animated-noise"
+import { BitmapChevron } from "@/components/landing/bitmap-chevron"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
