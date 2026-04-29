@@ -29,7 +29,9 @@
       "Bash(npm install *)",
       "mcp__Claude_in_Chrome__tabs_context_mcp",
       "mcp__Claude_in_Chrome__navigate",
-      "mcp__Claude_in_Chrome__computer"
+      "mcp__Claude_in_Chrome__computer",
+      "Bash(node -e \"const pkg=require\\('./package.json'\\); console.log\\(pkg.dependencies.lenis\\)\")",
+      "Bash(node -e ' *)"
     ]
   }
 }
