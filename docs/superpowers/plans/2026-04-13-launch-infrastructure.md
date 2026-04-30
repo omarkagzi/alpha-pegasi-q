@@ -2301,20 +2301,38 @@ Cookie consent banner with localStorage persistence."
 
 ---
 
-### Task 24: Create Landing Page
+### Task 24: Wire Up the Integrated Landing Page
+
+**Status update (2026-04-30):** The landing page draft from the standalone `Landing Page/` project has already been merged into the main app. See [docs/landing-page-integration-file-map.md](../../landing-page-integration-file-map.md) for the full file map. Components live under `src/components/landing/`, the root `src/app/page.tsx` already renders them (no longer a redirect to `/world`), and fonts/noise overlay are wired into `src/app/layout.tsx`.
+
+This task no longer creates the landing page from scratch. It fills the **launch-critical gaps** between the design draft and what the spec requires: founder counter widget, PostHog tracking, "what is this" feature panels, hero CTA → sign-up, colophon legal links + contact info, and SideNav cleanup.
+
+**Files (all already exist unless marked Create):**
+- Create: `src/components/landing/founder-counter.tsx`
+- Create: `src/components/landing/landing-page-tracker.tsx`
+- Create: `src/components/landing/feature-panels.tsx`
+- Modify: `src/components/landing/hero-section.tsx` (CTA → `/sign-up`, embed FounderCounter)
+- Modify: `src/components/landing/colophon-section.tsx` (legal links, email, twitter)
+- Modify: `src/components/landing/side-nav.tsx` (remove Signals, rename Experiments → Agents)
+- Modify: `src/app/page.tsx` (mount tracker, insert FeaturePanels)
+- Delete: `src/components/landing/signals-section.tsx` (stub, not used)
+
+**Deferred for launch polish (Week 5, NOT this task):**
+- Brand swap "VOLANIA" → "ALPHA PEGASI Q" in hero split-flap and colophon copyright. The user has explicitly chosen to keep "Volania" as a working brand name during build-out and will rename in a single sweep before launch.
+- Demo video placeholder slot in hero — see Task 24H below; spec only, no code change yet.
+
+---
+
+#### Task 24A: Build FounderCounter widget
 
 **Files:**
-- Create: `src/components/landing/Hero.tsx`
-- Create: `src/components/landing/FeaturePanels.tsx`
-- Create: `src/components/landing/FounderCounter.tsx`
-- Create: `src/components/landing/Footer.tsx`
-- Modify: `src/app/page.tsx` (replace redirect)
+- Create: `src/components/landing/founder-counter.tsx`
 
-Note: This task creates the structural components. Visual polish (animations, exact styling, demo video embed) is done during Week 5 polish. The focus here is getting the content and layout right.
+The widget fetches `/api/config/founder-count` (built in Task 19) and renders the seat status. Styling matches the existing hero/colophon design system: IBM Plex Mono, uppercase tracking, accent color from theme tokens — NOT generic Tailwind grays.
 
-- [ ] **Step 1: Create FounderCounter component**
+- [ ] **Step 1: Create the FounderCounter component**
 
-Create `src/components/landing/FounderCounter.tsx`:
+Create `src/components/landing/founder-counter.tsx`:
 
 ```typescript
 'use client';
@@ -2342,178 +2360,535 @@ export function FounderCounter() {
 
   if (!status.isFounderAvailable) {
     return (
-      <p className="text-sm text-amber-400">
-        Founder seats are sold out. Stewards join at $10/month.
+      <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+        Founder seats sold out — Steward $10/mo
       </p>
     );
   }
 
   return (
-    <p className="text-sm text-emerald-400">
-      {status.seatsRemaining} of {status.seatsMax} Founder seats remaining at $8/month
+    <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">
+      {status.seatsRemaining} / {status.seatsMax} Founder seats — $8/mo
     </p>
   );
 }
 ```
 
-- [ ] **Step 2: Create Hero component**
+Styling rationale: matches the existing hero "V.01 / EXOSKELETON LAUNCH BUILD" tag (mono, 10px, uppercase, 0.3em tracking). Uses theme tokens (`text-accent`, `text-muted-foreground`) so it inherits the dark palette already established in `globals.css`.
 
-Create `src/components/landing/Hero.tsx`:
+- [ ] **Step 2: Commit**
 
-```typescript
-import Link from 'next/link';
-import { FounderCounter } from './FounderCounter';
+```bash
+git add src/components/landing/founder-counter.tsx
+git commit -m "feat(landing): add FounderCounter widget
 
-export function Hero() {
-  return (
-    <section className="min-h-screen flex flex-col items-center justify-center text-center px-6 py-24">
-      <h1 className="text-4xl md:text-6xl font-bold max-w-3xl leading-tight">
-        A persistent world where AI agents live, talk, and remember
-      </h1>
-      <p className="mt-6 text-lg md:text-xl text-gray-400 max-w-2xl">
-        AI agents live autonomous lives in a digital settlement. They form relationships,
-        write journals, and evolve beliefs — even when you&apos;re not watching.
-        Visit as a Traveler. Shape the world as a Steward.
-      </p>
-      <div className="mt-10 flex flex-col items-center gap-4">
-        <Link
-          href="/sign-up"
-          className="px-8 py-4 bg-white text-gray-900 rounded-lg text-lg font-semibold hover:bg-gray-200 transition-colors"
-        >
-          Enter the World
-        </Link>
-        <FounderCounter />
-      </div>
-      {/* Demo video/GIF slot — add during Week 5 polish */}
-      <div className="mt-16 w-full max-w-4xl aspect-video bg-gray-800/50 rounded-xl border border-gray-700 flex items-center justify-center">
-        <span className="text-gray-500">Demo video — added during launch prep</span>
-      </div>
-    </section>
-  );
-}
+Fetches /api/config/founder-count and renders 'X / Y Founder seats — \$8/mo'
+in mono accent text. Falls back to muted sold-out message when seats exhausted.
+Styled to match existing hero info-tag design."
 ```
 
-- [ ] **Step 3: Create FeaturePanels component**
+---
 
-Create `src/components/landing/FeaturePanels.tsx`:
+#### Task 24B: Build LandingPageTracker
 
-```typescript
-const features = [
-  {
-    title: 'A Living World',
-    description:
-      'Every 6 minutes, agents talk, trade, and form relationships on their own. The world evolves whether you are watching or not.',
-  },
-  {
-    title: 'Persistent Memory',
-    description:
-      'Every conversation, relationship, and event is remembered. Agents develop beliefs about each other that change over time.',
-  },
-  {
-    title: 'Your Agents',
-    description:
-      'Create your own characters and watch them become part of the world. They will form relationships, develop opinions, and surprise you.',
-  },
-];
+**Files:**
+- Create: `src/components/landing/landing-page-tracker.tsx`
 
-export function FeaturePanels() {
-  return (
-    <section className="py-24 px-6">
-      <div className="max-w-5xl mx-auto grid md:grid-cols-3 gap-8">
-        {features.map((feature) => (
-          <div
-            key={feature.title}
-            className="p-6 bg-gray-800/50 rounded-xl border border-gray-700"
-          >
-            <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
-            <p className="text-gray-400">{feature.description}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-```
+Trivial client component that fires the PostHog `landing_page_view` event on mount. The `analytics.landingPageView()` helper already exists in `src/lib/analytics/events.ts`.
 
-- [ ] **Step 4: Create Footer component**
+- [ ] **Step 1: Create the tracker**
 
-Create `src/components/landing/Footer.tsx`:
+Create `src/components/landing/landing-page-tracker.tsx`:
 
-```typescript
-import Link from 'next/link';
-
-export function Footer() {
-  return (
-    <footer className="border-t border-gray-800 py-8 px-6">
-      <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-        <p>&copy; {new Date().getFullYear()} Alpha Pegasi Q</p>
-        <div className="flex gap-6">
-          <Link href="/privacy" className="hover:text-gray-300">Privacy Policy</Link>
-          <Link href="/terms" className="hover:text-gray-300">Terms of Service</Link>
-          <a href="mailto:hello@alphapegasi.com" className="hover:text-gray-300">Contact</a>
-        </div>
-      </div>
-    </footer>
-  );
-}
-```
-
-- [ ] **Step 5: Replace the root page.tsx**
-
-Replace `src/app/page.tsx` (currently just a redirect to `/world`) with:
-
-```typescript
-import { Hero } from '@/components/landing/Hero';
-import { FeaturePanels } from '@/components/landing/FeaturePanels';
-import { Footer } from '@/components/landing/Footer';
-import { LandingPageTracker } from '@/components/landing/LandingPageTracker';
-
-export default function Home() {
-  return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <LandingPageTracker />
-      <Hero />
-      <FeaturePanels />
-      {/* Social proof — empty at launch, filled with real user quotes post-launch */}
-      <section className="py-16 px-6">
-        <div className="max-w-5xl mx-auto text-center text-gray-500 text-sm">
-          <p>Join the first travelers exploring a world that never stops evolving.</p>
-        </div>
-      </section>
-      <Footer />
-    </div>
-  );
-}
-```
-
-Also create a small `src/components/landing/LandingPageTracker.tsx` (client component):
 ```typescript
 'use client';
+
 import { useEffect } from 'react';
 import { analytics } from '@/lib/analytics/events';
 
 export function LandingPageTracker() {
-  useEffect(() => { analytics.landingPageView(); }, []);
+  useEffect(() => {
+    analytics.landingPageView();
+  }, []);
   return null;
 }
 ```
 
-- [ ] **Step 6: Verify the landing page renders**
-
-Run: `npm run dev`
-Open `http://localhost:3000` — should show landing page, NOT redirect to `/world`.
-Expected: Hero, feature panels, footer, founder counter visible.
-
-- [ ] **Step 7: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
-git add src/components/landing/ src/app/page.tsx
-git commit -m "feat: add landing page with hero, feature panels, founder counter
-
-Replaces the redirect-to-/world with a proper public landing page.
-Hero has pitch + CTA + founder counter. Three feature panels.
-Footer with legal links. Demo video slot for Week 5 polish."
+git add src/components/landing/landing-page-tracker.tsx
+git commit -m "feat(landing): add LandingPageTracker for PostHog landing_page_view event"
 ```
+
+---
+
+#### Task 24C: Build FeaturePanels ("what is this" section)
+
+**Files:**
+- Create: `src/components/landing/feature-panels.tsx`
+
+A 3-card "what is this" section that sits between the Hero and the WorkSection (agent showcase). Purpose: answer the visitor's question "what am I looking at?" before the agent grid rewards the curious. Styling matches the existing card design from `work-section.tsx` (border-border/40, mono labels, Bebas Neue titles, accent hover state).
+
+- [ ] **Step 1: Create the FeaturePanels component**
+
+Create `src/components/landing/feature-panels.tsx`:
+
+```typescript
+"use client"
+
+import { useRef, useEffect } from "react"
+import gsap from "gsap"
+import { ScrollTrigger } from "gsap/ScrollTrigger"
+
+gsap.registerPlugin(ScrollTrigger)
+
+const features = [
+  {
+    number: "01",
+    label: "A Living World",
+    title: "AGENTS LIVE",
+    body: "Every six minutes, agents talk, trade, and form relationships on their own. The world evolves whether you are watching or not.",
+  },
+  {
+    number: "02",
+    label: "Persistent Memory",
+    title: "WORLDS REMEMBER",
+    body: "Every conversation, relationship, and event is remembered. Agents develop beliefs about each other that change over time.",
+  },
+  {
+    number: "03",
+    label: "Your Agents",
+    title: "YOU SHAPE IT",
+    body: "Create your own characters and watch them become part of the world. They form relationships, develop opinions, and surprise you.",
+  },
+]
+
+export function FeaturePanels() {
+  const sectionRef = useRef<HTMLElement>(null)
+  const headerRef = useRef<HTMLDivElement>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!sectionRef.current) return
+
+    const ctx = gsap.context(() => {
+      if (headerRef.current) {
+        gsap.from(headerRef.current, {
+          x: -60,
+          opacity: 0,
+          duration: 1,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: headerRef.current,
+            start: "top 90%",
+            toggleActions: "play none none reverse",
+          },
+        })
+      }
+
+      const cards = gridRef.current?.querySelectorAll("article")
+      if (cards && cards.length > 0) {
+        gsap.set(cards, { y: 60, opacity: 0 })
+        gsap.to(cards, {
+          y: 0,
+          opacity: 1,
+          duration: 0.8,
+          stagger: 0.12,
+          ease: "power3.out",
+          scrollTrigger: {
+            trigger: gridRef.current,
+            start: "top 90%",
+            toggleActions: "play none none reverse",
+          },
+        })
+      }
+    }, sectionRef)
+
+    return () => ctx.revert()
+  }, [])
+
+  return (
+    <section
+      ref={sectionRef}
+      id="overview"
+      className="relative py-32 pl-6 md:pl-28 pr-6 md:pr-12"
+    >
+      <div ref={headerRef} className="mb-16">
+        <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-accent">
+          01 / OVERVIEW
+        </span>
+        <h2 className="mt-4 font-[var(--font-bebas)] text-5xl md:text-7xl tracking-tight">
+          WHAT IS THIS
+        </h2>
+      </div>
+
+      <div ref={gridRef} className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        {features.map((feature) => (
+          <article
+            key={feature.number}
+            className="group relative border border-border/40 p-6 flex flex-col justify-between min-h-[260px] transition-all duration-500 hover:border-accent/60"
+          >
+            <div className="absolute inset-0 bg-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="relative z-10">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                {feature.label}
+              </span>
+              <h3 className="mt-3 font-[var(--font-bebas)] text-3xl md:text-4xl tracking-tight">
+                {feature.title}
+              </h3>
+            </div>
+            <p className="relative z-10 mt-6 font-mono text-xs text-muted-foreground leading-relaxed">
+              {feature.body}
+            </p>
+            <span className="absolute bottom-4 right-4 font-mono text-[10px] text-muted-foreground/40">
+              {feature.number}
+            </span>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+```
+
+Design notes:
+- Section number `01 / OVERVIEW` — pushes existing sections down: WorkSection becomes `02 / AI`, Principles `03`, Colophon `04`. Update those headings in the existing files (Step 2 below).
+- Same border, hover, and Bebas Neue conventions as `work-section.tsx`. No external CSS needed.
+- GSAP scroll animations match the cadence of the rest of the page.
+
+- [ ] **Step 2: Update existing section numbers**
+
+The new `01 / OVERVIEW` shifts the count. Update these literal strings:
+
+- `src/components/landing/work-section.tsx` — change `02 / AI` to `02 / AGENTS` (also matches the SideNav rename in Task 24F)
+- `src/components/landing/principles-section.tsx` — keep `03 / Principles` (already correct)
+- `src/components/landing/colophon-section.tsx` — keep `04 / MORE` (already correct)
+
+Verify: `grep -n "02 / AI" src/components/landing/work-section.tsx` returns one line at the section header.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/components/landing/feature-panels.tsx src/components/landing/work-section.tsx
+git commit -m "feat(landing): add FeaturePanels 'what is this' section
+
+Three-card overview between Hero and WorkSection. Answers 'what am I
+looking at?' before the agent showcase. Matches existing card design
+language (border, mono labels, Bebas titles, GSAP scroll-in).
+Renames WorkSection chip from '02 / AI' to '02 / AGENTS'."
+```
+
+---
+
+#### Task 24D: Wire Hero CTA to /world/arboria/market-town + embed FounderCounter
+
+**Files:**
+- Modify: `src/components/landing/hero-section.tsx`
+
+The current CTA is `<a href="#work">` (scrolls to agents). The spec originally called for `/sign-up`, but a deep link straight into the world is better:
+
+- **Signed-out visitors** → Clerk middleware (already configured in `middleware.ts` to protect `/world(.*)`) auto-redirects them to sign-in, then bounces them back to the deep link after auth. The funnel is preserved with one less click than going via `/sign-up`.
+- **Signed-in users** → drop straight into Arboria's market town with no friction.
+- **Relative path, not absolute** — `/world/arboria/market-town` (NOT `https://alpha-pegasi-q.vercel.app/...`). The relative path works on localhost, preview deploys, and any future custom domain. It also enables Next.js Link prefetch.
+
+The FounderCounter must sit visibly under the CTA so the scarcity signal is in the same eye-line as the action.
+
+- [ ] **Step 1: Read the current hero-section.tsx**
+
+Confirm the CTA block is at lines 66-79 and the `href="#work"` anchor is at line 68.
+
+- [ ] **Step 2: Update the CTA to a Next.js Link with click-tracking**
+
+In `src/components/landing/hero-section.tsx`:
+
+Add to the imports at top of file:
+```typescript
+import Link from "next/link"
+import { FounderCounter } from "@/components/landing/founder-counter"
+import { trackEvent } from "@/lib/analytics/events"
+```
+
+Replace the entire CTA block (the `<div className="mt-16 flex items-center gap-8">...` through its closing `</div>`) with:
+
+```tsx
+<div className="mt-16 flex flex-col items-start gap-4">
+  <Link
+    href="/world/arboria/market-town"
+    onClick={() => trackEvent("enter_world_clicked", { source: "hero_cta" })}
+    className="group inline-flex items-center gap-3 border border-foreground/20 px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
+  >
+    <ScrambleTextOnHover text="Enter The World" as="span" duration={0.6} />
+    <BitmapChevron className="transition-transform duration-[400ms] ease-in-out group-hover:rotate-45" />
+  </Link>
+  <FounderCounter />
+</div>
+```
+
+Notes:
+- Removed the empty second `<a href="#signals">` (no text content; section being deleted in Task 24F).
+- Kept `ScrambleTextOnHover` and `BitmapChevron` — brand-defining hover effects.
+- Switched outer flex from `items-center gap-8` (horizontal) to `flex-col items-start gap-4` so FounderCounter sits directly beneath the CTA, aligned to its left edge.
+- `trackEvent("enter_world_clicked", ...)` fires on click. This replaces the spec's original plan to track `signup_started` on the `/sign-up` page — since the CTA now skips that page for signed-in users, click-time tracking is the only place that reliably captures intent. Funnel analysis: `landing_page_view` → `enter_world_clicked` → `signup_completed` (for new users) or direct world entry (for returning users).
+
+- [ ] **Step 3: Verify the build**
+
+Run: `npm run build`
+Expected: succeeds with no TypeScript errors. The `/world/arboria/market-town` route is the existing settlement page — already builds today.
+
+- [ ] **Step 4: Verify the auth gate works**
+
+Open an incognito window, visit `http://localhost:3000`, click "Enter The World".
+Expected: Clerk redirects to sign-in. After signing in, you land on Arboria market town (not back at the landing page).
+
+If the redirect-back-to-deep-link does not work out of the box, check that Clerk's `signInFallbackRedirectUrl` (or equivalent) is configured. This is a Clerk config concern, not a code change in this task — flag it if broken.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/components/landing/hero-section.tsx
+git commit -m "feat(landing): hero CTA deep-links to /world/arboria/market-town
+
+CTA was a scroll anchor to #work. Now a Next.js Link straight into
+Arboria's market town. Clerk middleware auto-gates unauthenticated
+visitors through sign-in, preserving the signup funnel with one less
+hop than a /sign-up intermediate page. Tracks 'enter_world_clicked'
+on click so funnel analytics still capture intent.
+FounderCounter sits directly under the CTA so scarcity is in eye-line
+with the action. Removed dead anchor to deleted #signals section."
+```
+
+---
+
+#### Task 24E: Update Colophon — legal links, email, twitter
+
+**Files:**
+- Modify: `src/components/landing/colophon-section.tsx`
+
+- [ ] **Step 1: Read current colophon-section.tsx**
+
+Confirm: contact column has `mailto:hello@signal.studio` (line ~119) and a placeholder twitter `<a href="#">` (line ~127). No Privacy/Terms links exist.
+
+- [ ] **Step 2: Update contact links**
+
+In `src/components/landing/colophon-section.tsx`, in the "Contact" column:
+
+Change:
+```tsx
+<a href="mailto:hello@signal.studio" ...>Email</a>
+```
+To:
+```tsx
+<a href="mailto:omarkagzi@gmail.com" ...>Email</a>
+```
+
+Change:
+```tsx
+<a href="#" ...>Twitter/X</a>
+```
+To:
+```tsx
+<a href="https://x.com/OmarKagzi" target="_blank" rel="noopener noreferrer" ...>Twitter/X</a>
+```
+
+- [ ] **Step 3: Add a Legal column**
+
+After the "Contact" column `<div>` and before the "Year" column, insert a new column. Note the grid uses `lg:grid-cols-6` — the existing 5 columns become 6, which fills the grid exactly:
+
+```tsx
+{/* Legal */}
+<div className="col-span-1">
+  <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Legal</h4>
+  <ul className="space-y-2">
+    <li>
+      <Link
+        href="/privacy"
+        className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+      >
+        Privacy Policy
+      </Link>
+    </li>
+    <li>
+      <Link
+        href="/terms"
+        className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+      >
+        Terms of Service
+      </Link>
+    </li>
+  </ul>
+</div>
+```
+
+Add the import at the top of the file:
+```typescript
+import Link from "next/link"
+```
+
+The `/privacy` and `/terms` routes already exist (added in the prior commit `0920503`).
+
+- [ ] **Step 4: Verify build**
+
+Run: `npm run build`
+Expected: succeeds.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/components/landing/colophon-section.tsx
+git commit -m "feat(landing): colophon — legal links, real contact, twitter
+
+Added Legal column with Privacy Policy and Terms of Service links
+(routes already exist). Updated email to omarkagzi@gmail.com.
+Twitter placeholder '#' replaced with https://x.com/OmarKagzi."
+```
+
+---
+
+#### Task 24F: SideNav cleanup — remove Signals, rename Experiments → Agents
+
+**Files:**
+- Modify: `src/components/landing/side-nav.tsx`
+- Delete: `src/components/landing/signals-section.tsx`
+
+- [ ] **Step 1: Update navItems in side-nav.tsx**
+
+Replace the `navItems` array (lines 6-12) with:
+
+```typescript
+const navItems = [
+  { id: "hero", label: "Index" },
+  { id: "overview", label: "Overview" },
+  { id: "work", label: "Agents" },
+  { id: "principles", label: "Principles" },
+  { id: "colophon", label: "Colophon" },
+]
+```
+
+Changes:
+- Removed `{ id: "signals", label: "Signals" }` — section is being deleted.
+- Added `{ id: "overview", label: "Overview" }` — matches the new FeaturePanels `id="overview"`.
+- Renamed `Experiments` → `Agents` to better describe the WorkSection content.
+
+- [ ] **Step 2: Delete the SignalsSection stub**
+
+Run: `rm "src/components/landing/signals-section.tsx"`
+
+The file currently exports `function SignalsSection() { return null }` and is not imported anywhere in `src/app/page.tsx`. Confirm with: `grep -rn "SignalsSection\|signals-section" src/` — expected zero matches after deletion.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/components/landing/side-nav.tsx
+git rm src/components/landing/signals-section.tsx
+git commit -m "feat(landing): SideNav — drop Signals, rename Experiments to Agents
+
+Removed dead Signals nav entry (section was a null-returning stub).
+Added Overview entry pointing to new FeaturePanels section.
+Renamed Experiments → Agents to match WorkSection content."
+```
+
+---
+
+#### Task 24G: Mount FeaturePanels and LandingPageTracker in page.tsx
+
+**Files:**
+- Modify: `src/app/page.tsx`
+
+- [ ] **Step 1: Update src/app/page.tsx**
+
+Replace the file contents with:
+
+```typescript
+import { HeroSection } from "@/components/landing/hero-section"
+import { FeaturePanels } from "@/components/landing/feature-panels"
+import { WorkSection } from "@/components/landing/work-section"
+import { PrinciplesSection } from "@/components/landing/principles-section"
+import { ColophonSection } from "@/components/landing/colophon-section"
+import { SideNav } from "@/components/landing/side-nav"
+import { SmoothScroll } from "@/components/landing/smooth-scroll"
+import { LandingPageTracker } from "@/components/landing/landing-page-tracker"
+
+export default function Home() {
+  return (
+    <SmoothScroll>
+      <LandingPageTracker />
+      <div className="landing-page">
+        <main className="relative min-h-screen bg-[oklch(0.08_0_0)] text-[oklch(0.95_0_0)]">
+          <SideNav />
+          <div className="grid-bg fixed inset-0 opacity-30" aria-hidden="true" />
+          <div className="relative z-10">
+            <HeroSection />
+            <FeaturePanels />
+            <WorkSection />
+            <PrinciplesSection />
+            <ColophonSection />
+          </div>
+        </main>
+      </div>
+    </SmoothScroll>
+  )
+}
+```
+
+Scroll order: Hero → Overview (FeaturePanels) → Agents (WorkSection) → Principles → Colophon. Matches the SideNav order from Task 24F.
+
+- [ ] **Step 2: Verify the landing page renders**
+
+Run: `npm run dev`
+Open `http://localhost:3000` — should show:
+- Hero with "Enter The World" linking to `/sign-up`
+- FounderCounter under the CTA showing seat count (or null if API not yet seeded)
+- Overview section with 3 cards
+- Agents grid (WorkSection)
+- Principles
+- Colophon with Privacy / Terms / mailto:omarkagzi / twitter link
+
+Check the browser console — `landing_page_view` should fire in PostHog if the user has accepted cookies (Task 22).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/app/page.tsx
+git commit -m "feat(landing): mount FeaturePanels and LandingPageTracker
+
+Adds the new 'what is this' section between Hero and Agents grid,
+and fires the PostHog landing_page_view event on mount."
+```
+
+---
+
+#### Task 24H: Demo video placeholder slot — DEFERRED to launch prep
+
+This sub-task is **documented but not implemented** in this plan. The user has flagged it as "the final thing to do before launch" — embed slot will be added during the Week 5 polish pass once the actual demo video/GIF asset is recorded and produced.
+
+**When implemented (Week 5):**
+- File: `src/components/landing/hero-section.tsx`
+- Insert a 16:9 aspect-ratio container after the CTA block but before the floating info tag, e.g.:
+  ```tsx
+  <div className="mt-16 w-full max-w-4xl aspect-video border border-border/40 bg-accent/5 flex items-center justify-center">
+    {/* Replace with <video> or <Image> embed */}
+    <span className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground">
+      Demo — coming soon
+    </span>
+  </div>
+  ```
+- Source the video from a CDN (Vercel Blob or similar). Use Next.js `<Image>` for poster frames; native `<video>` with `playsInline muted autoplay loop` for the GIF-replacement experience.
+- Consider whether the demo embed should sit inside the hero (above the fold, but pushes the info-tag down) or as its own section between FeaturePanels and WorkSection.
+
+**Do NOT implement this in the current pass.** Marked here only so it isn't lost.
+
+---
+
+#### Task 24 — Out of scope (deferred until brand sweep)
+
+The following polish items are explicitly NOT part of this task and will be handled in a single rename sweep before launch:
+
+- **VOLANIA → ALPHA PEGASI Q** in [hero-section.tsx](../../../src/components/landing/hero-section.tsx) (split-flap text at line ~51).
+- **© 2026 Volania → © 2026 Alpha Pegasi Q** in [colophon-section.tsx](../../../src/components/landing/colophon-section.tsx) (line ~152).
+- Page metadata `title` in [layout.tsx](../../../src/app/layout.tsx) is already `"Alpha Pegasi q"` — no change needed there.
+
+The "Volania" name is intentionally retained during build-out to keep the design draft stable.
 
 ---
 
