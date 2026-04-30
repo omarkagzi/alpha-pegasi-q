@@ -116,7 +116,7 @@ export function ColophonSection() {
           <ul className="space-y-2">
             <li>
               <a
-                href="mailto:hello@signal.studio"
+                href="mailto:omarkagzi@gmail.com"
                 className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
               >
                 Email
@@ -124,10 +124,35 @@ export function ColophonSection() {
             </li>
             <li>
               <a
-                href="#"
+                href="https://x.com/OmarKagzi"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
               >
                 Twitter/X
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        {/* Legal */}
+        <div className="col-span-1">
+          <h4 className="font-mono text-[9px] uppercase tracking-[0.3em] text-muted-foreground mb-4">Legal</h4>
+          <ul className="space-y-2">
+            <li>
+              <a
+                href="/privacy"
+                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+              >
+                Privacy Policy
+              </a>
+            </li>
+            <li>
+              <a
+                href="/terms"
+                className="font-mono text-xs text-foreground/80 hover:text-accent transition-colors duration-200"
+              >
+                Terms of Service
               </a>
             </li>
           </ul>

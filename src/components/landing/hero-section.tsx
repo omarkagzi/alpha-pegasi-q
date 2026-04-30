@@ -5,6 +5,7 @@ import { ScrambleTextOnHover } from "@/components/landing/scramble-text"
 import { SplitFlapText, SplitFlapMuteToggle, SplitFlapAudioProvider } from "@/components/landing/split-flap-text"
 import { AnimatedNoise } from "@/components/landing/animated-noise"
 import { BitmapChevron } from "@/components/landing/bitmap-chevron"
+import { FounderCounter } from "@/components/landing/founder-counter"
 import gsap from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 
@@ -65,7 +66,7 @@ export function HeroSection() {
 
         <div className="mt-16 flex items-center gap-8">
           <a
-            href="#work"
+            href="/world/arboria/market-town"
             className="group inline-flex items-center gap-3 border border-foreground/20 px-6 py-3 font-mono text-xs uppercase tracking-widest text-foreground hover:border-accent hover:text-accent transition-all duration-200"
           >
             <ScrambleTextOnHover text="Enter The World" as="span" duration={0.6} />
@@ -80,10 +81,11 @@ export function HeroSection() {
       </div>
 
       {/* Floating info tag */}
-      <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12">
+      <div className="absolute bottom-8 right-8 md:bottom-12 md:right-12 flex flex-col gap-3">
         <div className="border border-border px-4 py-2 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           V.01 / EXOSKELETON LAUNCH BUILD
         </div>
+        <FounderCounter />
       </div>
     </section>
   )
