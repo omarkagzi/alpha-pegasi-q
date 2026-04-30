@@ -30,23 +30,33 @@ export function FeaturePanels() {
 
     const ctx = gsap.context(() => {
       const cards = cardsRef.current?.querySelectorAll(":scope > div")
-      if (cards) {
-        gsap.from(cards, {
-          y: 40,
-          opacity: 0,
-          duration: 0.8,
-          stagger: 0.15,
-          ease: "power3.out",
-          scrollTrigger: {
-            trigger: cardsRef.current,
-            start: "top 85%",
-            toggleActions: "play none none reverse",
-          },
-        })
+      if (cards && cards.length) {
+        gsap.fromTo(
+          cards,
+          { y: 40, opacity: 0 },
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.8,
+            stagger: 0.15,
+            ease: "power3.out",
+            clearProps: "opacity,transform",
+            scrollTrigger: {
+              trigger: cardsRef.current,
+              start: "top 95%",
+              once: true,
+            },
+          }
+        )
       }
     }, sectionRef)
 
-    return () => ctx.revert()
+    const refreshId = window.setTimeout(() => ScrollTrigger.refresh(), 100)
+
+    return () => {
+      window.clearTimeout(refreshId)
+      ctx.revert()
+    }
   }, [])
 
   return (
